@@ -1,6 +1,6 @@
-"""x33fcon adapter — x33fcon.com is a single-page JS app whose archive
-renders client-side. We render the homepage once and parse talk blocks
-(headings + speaker/pdf links) from the rendered DOM."""
+"""x33fcon adapter — the site is an MDwiki whose content pages are static
+markdown files. Archives live at archive/<year>/con.md with agenda tables:
+| time | **Speaker** | [Title](s/X.md) | [slides](/slides/*.pdf) |"""
 from __future__ import annotations
 
 import json
@@ -8,58 +8,57 @@ import re
 import time
 from pathlib import Path
 
-from bs4 import BeautifulSoup
-
-from crawler.dataset import atomic_write_json
-from crawler.render import rendered_html
+from crawler.net import curl_get
 
 ID = "x33fcon"
 NAME = "x33fcon"
-DESCRIPTION = "Polish conference for red teamers and exploit developers."
 URL = "https://x33fcon.com/"
-BASE = "https://x33fcon.com/"
+DESCRIPTION = "Polish conference where blue and red teams meet, since 2017."
+YEARS = [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017]
+
+_ROW_SKIP = re.compile(r"coffee|lunch|break|opening|closing|registration|party|ctf", re.I)
 
 
 def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:60] or "untitled"
 
 
-def parse_rendered(html: str) -> list[dict]:
-    soup = BeautifulSoup(html, "lxml")
+def parse_agenda_md(md: str, year: int) -> list[dict]:
     records = []
-    # talk blocks: cards with a heading and a pdf/youtube link
-    for block in soup.select("div, section, article, li"):
-        h = block.find(["h2", "h3", "h4", "h5"], recursive=False)
-        if not h:
+    for line in md.splitlines():
+        if not line.strip().startswith("|"):
             continue
-        title = h.get_text(" ", strip=True)
-        if len(title) < 8:
+        speaker_m = re.search(r"\*\*([^*]+)\*\*", line)
+        title_m = re.search(r"\[([^\]!][^\]]*)\]\((?!/img)[^)]+\)", line)
+        slides_m = re.search(r"\((/slides/[^)]+\.pdf)\)", line)
+        if not (speaker_m and title_m):
             continue
-        pdf = block.find("a", href=re.compile(r"\.pdf$", re.I))
-        yt = block.find("a", href=re.compile(r"youtube\.com|youtu\.be", re.I))
-        if not (pdf or yt):
-            continue  # not a talk block
-        # year from nearby edition text or pdf path
-        year_m = re.search(r"(20[12]\d)", str(block)[:500] or "")
-        year = int(year_m.group(1)) if year_m else 0
+        title = title_m.group(1).strip().strip("*").strip()
+        title = re.sub(r"^Keynote:\s*", "", title)
+        if not title or _ROW_SKIP.fullmatch(title.replace(" ", "")):
+            continue
+        speakers = [
+            {"name": s.strip(), "company": None, "role": None}
+            for s in re.split(r"\s+and\s+|,", speaker_m.group(1))
+            if 2 <= len(s.strip()) < 40
+        ]
         records.append(
             {
-                "id": f"x33f-{_slug(title)}",
-                "event": {"region": "eu", "year": year, "label": "x33fcon"},
+                "id": f"x33f{str(year)[2:]}-{_slug(title)}",
+                "event": {"region": "eu", "year": year, "label": f"x33fcon {str(year)[2:]}"},
                 "title": title,
-                "speakers": [],
-                "abstract": block.get_text(" ", strip=True)[:400],
+                "speakers": speakers[:4],
+                "abstract": "",
                 "track": None,
                 "files": {
-                    "slides": pdf["href"] if pdf else None,
+                    "slides": ("https://x33fcon.com" + slides_m.group(1)) if slides_m else None,
                     "whitepaper": None,
                     "tool": None,
                 },
-                "video_url": yt["href"] if yt else None,
-                "source_url": BASE,
+                "video_url": None,
+                "source_url": f"https://x33fcon.com/#!archive/{year}/con.md",
             }
         )
-    # dedupe by title
     seen = set()
     out = []
     for r in records:
@@ -70,7 +69,30 @@ def parse_rendered(html: str) -> list[dict]:
     return out
 
 
+def collect_year(year: int, log=None) -> dict:
+    say = log or (lambda s: None)
+    code, md = curl_get(f"https://x33fcon.com/archive/{year}/con.md", timeout=30)
+    time.sleep(1.0)
+    if code == 404:
+        return {"status": "skipped", "meta": {"trace": [f"no archive for {year}"]}}
+    if code != 200:
+        return {"status": "failed", "meta": {"trace": [f"HTTP {code} for {year}"]}}
+    records = parse_agenda_md(md, year)
+    say(f"{year}: {len(records)} talks from markdown agenda")
+    if not records:
+        return {"status": "failed", "meta": {"trace": [f"{year}: agenda table not parsed"]}}
+    return {
+        "status": "ok",
+        "kind": "records",
+        "records": records,
+        "meta": {"source": URL, "url": f"https://x33fcon.com/archive/{year}/con.md",
+                 "title": f"x33fcon {year}", "trace": []},
+    }
+
+
 def collect(ctx: dict) -> dict[str, dict]:
+    from crawler.dataset import atomic_write_json
+
     cache_dir = Path(ctx["cache_dir"])
     cache_dir.mkdir(parents=True, exist_ok=True)
     captures: dict[str, dict] = dict(ctx["cache_read"])
@@ -82,30 +104,39 @@ def collect(ctx: dict) -> dict[str, dict]:
                 continue
     if ctx["use_cache"]:
         return captures
-    if captures.get("all", {}).get("status") == "ok" and not ctx["refresh"]:
-        return captures
 
-    from playwright.sync_api import sync_playwright
+    def say(line: str):
+        print(f"    {line}")
 
-    print("[x33fcon] rendering", BASE)
-    with sync_playwright() as pw:
-        html = rendered_html(pw, BASE, settle=8.0)
-    if not html:
-        cap = {"status": "failed", "meta": {"trace": ["render failed"]}}
-        captures["all"] = cap
-        atomic_write_json(cache_dir / "all.json", cap)
-        return captures
-    records = parse_rendered(html)
-    print(f"    rendered {len(html)}B -> {len(records)} talks")
-    cap = {
-        "status": "ok" if records else "failed",
-        "kind": "records",
-        "records": records,
-        "meta": {"source": BASE, "url": BASE, "title": "x33fcon",
-                 "trace": [f"rendered {len(html)}B, {len(records)} talks",
-                           "structure: " + ("rich" if records else "unknown — inspect cache")]},
-    }
-    atomic_write_json(cache_dir / "all.json", cap)
-    (cache_dir / "rendered.html").write_text(html, encoding="utf-8")  # for structure iteration
-    captures["all"] = cap
+    wanted = set(ctx["events"]) if ctx["events"] else None
+    todo = []
+    for year in YEARS:
+        key = f"x33f-{year}"
+        if wanted and key not in wanted and str(year) not in wanted:
+            continue
+        if key in captures and captures[key].get("status") == "ok" and not ctx["refresh"]:
+            continue
+        todo.append((key, year))
+    if ctx["limit"]:
+        todo = todo[: ctx["limit"]]
+    say(f"to crawl: {len(todo)} year(s)")
+
+    for i, (key, year) in enumerate(todo):
+        print(f"[{i + 1}/{len(todo)}] x33fcon/{key}")
+        try:
+            cap = collect_year(year, log=say)
+        except Exception as e:
+            import traceback
+
+            traceback.print_exc()
+            print(f"    ERROR: {e!r} — continuing")
+            cap = {"status": "failed", "meta": {"trace": [f"exception: {e!r}"]}}
+        atomic_write_json(cache_dir / f"{key}.json", cap)
+        captures[key] = cap
+        if cap.get("status") == "ok":
+            print(f"    ok: {len(cap['records'])} talks")
+        elif cap.get("status") == "skipped":
+            print("    skipped")
+        else:
+            print("    FAILED")
     return captures

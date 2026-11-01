@@ -1,7 +1,8 @@
-"""Red Team Village adapter — redteamvillage.org is an SPA (all routes return
-the same JS shell). Render the homepage/talks route once, parse talk blocks,
-and dump rendered.html into the cache so the parser can be sharpened on real
-structure next iteration."""
+"""Red Team Village adapter — redteamvillage.io (the .org domain is expired
+and parked). Astro static site; the schedule page links out to the current
+DEF CON schedule rather than embedding talks, so historical material arrives
+via the DEF CON adapter's villages directory (track='Red Team Village').
+This adapter parses the schedule/events pages best-effort."""
 from __future__ import annotations
 
 import json
@@ -11,65 +12,53 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from crawler.dataset import atomic_write_json
-from crawler.render import rendered_html
+from crawler.net import curl_get
 
 ID = "redteamvillage"
 NAME = "Red Team Village"
-DESCRIPTION = "DEF CON Red Team Village - red teaming talks and workshops."
-URL = "https://redteamvillage.org/"
-URLS = ["https://redteamvillage.org/", "https://redteamvillage.org/talks/"]
+URL = "https://redteamvillage.io/"
+DESCRIPTION = "DEF CON Red Team Village — red teaming talks and workshops."
+PAGES = ["https://redteamvillage.io/schedule/", "https://redteamvillage.io/events/"]
 
 
 def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:60] or "untitled"
 
 
-def parse_rendered(html: str) -> list[dict]:
+def parse_page(html: str, year: int, base: str) -> list[dict]:
     soup = BeautifulSoup(html, "lxml")
     records = []
-    for block in soup.select("div, section, article, li"):
-        h = block.find(["h2", "h3", "h4", "h5"], recursive=False)
+    for card in soup.select("article, .talk, .schedule-item, li, div.card"):
+        h = card.find(["h2", "h3", "h4", "h5"], recursive=False)
         if not h:
             continue
         title = h.get_text(" ", strip=True)
-        if len(title) < 8:
+        if len(title) < 6:
             continue
-        pdf = block.find("a", href=re.compile(r"\.pdf$", re.I))
-        yt = block.find("a", href=re.compile(r"youtube\.com|youtu\.be", re.I))
+        pdf = card.find("a", href=re.compile(r"\.pdf$", re.I))
+        yt = card.find("a", href=re.compile(r"youtube\.com|youtu\.be", re.I))
         if not (pdf or yt):
             continue
-        year_m = re.search(r"(20[12]\d)", block.get_text(" ", strip=True)[:200])
-        year = int(year_m.group(1)) if year_m else 0
-        text = block.get_text(" ", strip=True)
         records.append(
             {
                 "id": f"rtv-{_slug(title)}",
                 "event": {"region": "us", "year": year, "label": "RTV"},
                 "title": title,
                 "speakers": [],
-                "abstract": text[:400],
+                "abstract": card.get_text(" ", strip=True)[:300],
                 "track": "Red Team Village",
-                "files": {
-                    "slides": pdf["href"] if pdf else None,
-                    "whitepaper": None,
-                    "tool": None,
-                },
+                "files": {"slides": pdf["href"] if pdf else None,
+                          "whitepaper": None, "tool": None},
                 "video_url": yt["href"] if yt else None,
-                "source_url": URLS[1],
+                "source_url": base,
             }
         )
-    seen = set()
-    out = []
-    for r in records:
-        if r["title"].lower() in seen:
-            continue
-        seen.add(r["title"].lower())
-        out.append(r)
-    return out
+    return records
 
 
 def collect(ctx: dict) -> dict[str, dict]:
+    from crawler.dataset import atomic_write_json
+
     cache_dir = Path(ctx["cache_dir"])
     cache_dir.mkdir(parents=True, exist_ok=True)
     captures: dict[str, dict] = dict(ctx["cache_read"])
@@ -81,35 +70,34 @@ def collect(ctx: dict) -> dict[str, dict]:
                 continue
     if ctx["use_cache"]:
         return captures
-    if captures.get("all", {}).get("status") == "ok" and not ctx["refresh"]:
+    if "all" in captures and captures["all"].get("status") == "ok" and not ctx["refresh"]:
         return captures
 
-    from playwright.sync_api import sync_playwright
+    import datetime as _dt
 
-    best = {"status": "failed", "meta": {"trace": []}}
-    with sync_playwright() as pw:
-        for url in URLS:
-            print(f"[redteamvillage] rendering {url}")
-            html = rendered_html(pw, url, settle=8.0)
-            if not html:
-                best["meta"]["trace"].append(f"render failed: {url}")
-                continue
-            records = parse_rendered(html)
-            best["meta"]["trace"].append(f"{url}: {len(html)}B -> {len(records)} talks")
-            if records:
-                best = {
-                    "status": "ok",
-                    "kind": "records",
-                    "records": records,
-                    "meta": {"source": url, "url": url, "title": "Red Team Village",
-                             "trace": best["meta"]["trace"]},
-                }
-                (cache_dir / "rendered.html").write_text(html, encoding="utf-8")
-                break
-            (cache_dir / f"rendered-{URLS.index(url)}.html").write_text(
-                html, encoding="utf-8"
-            )
-    print(f"    {best['meta'].get('trace', [])[-1]}")
-    atomic_write_json(cache_dir / "all.json", best)
-    captures["all"] = best
+    year = _dt.date.today().year
+    records = []
+    trace = []
+    for url in PAGES:
+        code, html = curl_get(url, timeout=30)
+        time.sleep(1.0)
+        if code != 200:
+            trace.append(f"{url}: HTTP {code}")
+            continue
+        found = parse_page(html, year, url)
+        trace.append(f"{url}: {len(html)}B -> {len(found)} talks")
+        records.extend(found)
+
+    if not records:
+        trace.append("no embedded talks: schedule links to the current DEF CON "
+                     "schedule; historical material arrives via defcon villages track")
+    cap = {
+        "status": "ok" if records else "failed",
+        "kind": "records",
+        "records": records,
+        "meta": {"source": URL, "url": URL, "title": "Red Team Village", "trace": trace},
+    }
+    atomic_write_json(cache_dir / "all.json", cap)
+    captures["all"] = cap
+    print(f"    RTV: {trace[-1]}")
     return captures

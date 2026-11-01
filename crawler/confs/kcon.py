@@ -1,69 +1,74 @@
-"""KCon adapter (知道创宇黑客江湖) — kcon.knownsec.com is a 1.3KB JS shell.
-Render-first adapter: renders the site, dumps rendered.html to the cache, and
-best-effort parses talk blocks (headings + speaker/pdf links). The dump lets
-the parser be sharpened on real structure next iteration."""
+"""KCon adapter (知道创宇 KCon 黑客江湖) — root 404s but history.html links
+per-year pages (kcon2021..2024.html) whose .title divs hold "议题 · 讲者"."""
 from __future__ import annotations
 
 import json
 import re
+import time
 from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from crawler.dataset import atomic_write_json
-from crawler.render import rendered_html
+from crawler.net import curl_get
 
 ID = "kcon"
 NAME = "KCon"
+URL = "https://kcon.knownsec.com/history.html"
 DESCRIPTION = "Knownsec's KCon hacker conference in China, since 2012."
-URL = "https://kcon.knownsec.com/"
-URLS = ["https://kcon.knownsec.com/", "https://kcon.knownsec.com/agenda"]
+HISTORY = "https://kcon.knownsec.com/history.html"
+_TIME_RE = re.compile(r"^\d{1,2}:\d{2}")
 
 
 def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:60] or "untitled"
 
 
-def parse_rendered(html: str) -> list[dict]:
+def parse_year_page(html: str, year: int) -> list[dict]:
     soup = BeautifulSoup(html, "lxml")
     records = []
-    for block in soup.select("div, section, article, li"):
-        h = block.find(["h2", "h3", "h4", "h5"], recursive=False)
-        if not h:
+    for el in soup.select(".title, .item .name, h3"):
+        text = el.get_text(" ", strip=True)
+        if not text or _TIME_RE.match(text) or len(text) < 6:
             continue
-        title = h.get_text(" ", strip=True)
-        if len(title) < 6:
+        if any(k in text for k in ("茶歇", "抽奖", "开幕", "颁奖", "午休")):
             continue
-        pdf = block.find("a", href=re.compile(r"\.pdf$", re.I))
-        if not pdf:
+        if "·" in text:
+            title, _, speaker = text.rpartition("·")
+            title = title.strip()
+            speaker = speaker.strip()
+        else:
+            title, speaker = text.strip(), ""
+        if not title or _TIME_RE.match(title):
             continue
-        text = block.get_text(" ", strip=True)
-        year_m = re.search(r"(20[12]\d)", text[:200])
-        year = int(year_m.group(1)) if year_m else 0
         records.append(
             {
-                "id": f"kcon-{_slug(title)}",
-                "event": {"region": "asia", "year": year, "label": "KCon"},
+                "id": f"kcon{str(year)[2:]}-{_slug(title)[:50]}",
+                "event": {"region": "asia", "year": year, "label": f"KCon {str(year)[2:]}"},
                 "title": title,
-                "speakers": [],
-                "abstract": text[:400],
+                "speakers": (
+                    [{"name": s.strip(), "company": None, "role": None}
+                     for s in re.split(r"[、,，]", speaker) if 1 <= len(s.strip()) <= 20]
+                )[:4],
+                "abstract": "",
                 "track": None,
-                "files": {"slides": pdf["href"], "whitepaper": None, "tool": None},
+                "files": {"slides": None, "whitepaper": None, "tool": None},
                 "video_url": None,
-                "source_url": URLS[0],
+                "source_url": f"https://kcon.knownsec.com/kcon{year}.html",
             }
         )
     seen = set()
     out = []
     for r in records:
-        if r["title"].lower() in seen:
+        if r["title"] in seen:
             continue
-        seen.add(r["title"].lower())
+        seen.add(r["title"])
         out.append(r)
     return out
 
 
 def collect(ctx: dict) -> dict[str, dict]:
+    from crawler.dataset import atomic_write_json
+
     cache_dir = Path(ctx["cache_dir"])
     cache_dir.mkdir(parents=True, exist_ok=True)
     captures: dict[str, dict] = dict(ctx["cache_read"])
@@ -75,32 +80,38 @@ def collect(ctx: dict) -> dict[str, dict]:
                 continue
     if ctx["use_cache"]:
         return captures
-    if captures.get("all", {}).get("status") == "ok" and not ctx["refresh"]:
+    if "all" in captures and captures["all"].get("status") == "ok" and not ctx["refresh"]:
         return captures
 
-    from playwright.sync_api import sync_playwright
+    code, html = curl_get(HISTORY, timeout=30)
+    time.sleep(1.0)
+    if code != 200:
+        cap = {"status": "failed", "meta": {"trace": [f"history.html HTTP {code}"]}}
+        atomic_write_json(cache_dir / "all.json", cap)
+        captures["all"] = cap
+        return captures
+    years = sorted({int(y) for y in re.findall(r'href="kcon(\d{4})\.html"', html)}, reverse=True)
+    print(f"    history.html: editions {years}")
 
-    best = {"status": "failed", "meta": {"trace": []}}
-    with sync_playwright() as pw:
-        for url in URLS:
-            print(f"[kcon] rendering {url}")
-            html = rendered_html(pw, url, settle=8.0)
-            if not html:
-                best["meta"]["trace"].append(f"render failed: {url}")
-                continue
-            records = parse_rendered(html)
-            best["meta"]["trace"].append(f"{url}: {len(html)}B -> {len(records)} talks")
-            (cache_dir / "rendered.html").write_text(html, encoding="utf-8")
-            if records:
-                best = {
-                    "status": "ok",
-                    "kind": "records",
-                    "records": records,
-                    "meta": {"source": url, "url": url, "title": "KCon",
-                             "trace": best["meta"]["trace"]},
-                }
-                break
-    print(f"    {best['meta'].get('trace', [])[-1]}")
-    atomic_write_json(cache_dir / "all.json", best)
-    captures["all"] = best
+    all_records = []
+    for year in years:
+        code, yhtml = curl_get(f"https://kcon.knownsec.com/kcon{year}.html", timeout=30)
+        time.sleep(1.0)
+        if code != 200:
+            print(f"    kcon{year}: HTTP {code}")
+            continue
+        recs = parse_year_page(yhtml, year)
+        print(f"    kcon{year}: {len(recs)} talks")
+        all_records.extend(recs)
+
+    cap = {
+        "status": "ok" if all_records else "failed",
+        "kind": "records",
+        "records": all_records,
+        "meta": {"source": URL, "url": URL, "title": "KCon",
+                 "trace": [f"{len(years)} editions, {len(all_records)} talks total"]},
+    }
+    atomic_write_json(cache_dir / "all.json", cap)
+    captures["all"] = cap
+    print(f"    KCon total: {len(all_records)} talks")
     return captures
