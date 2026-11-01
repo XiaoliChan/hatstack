@@ -75,6 +75,7 @@ export function ResultRow({ s, terms }: { s: Session; terms: Set<string> }) {
         {s.files.slides && <FileLink href={s.files.slides}>Slides</FileLink>}
         {s.files.whitepaper && <FileLink href={s.files.whitepaper}>Whitepaper</FileLink>}
         {s.files.tool && <FileLink href={s.files.tool}>Tool</FileLink>}
+        {s.video_url && <FileLink href={s.video_url}>Video</FileLink>}
         {long && (
           <button
             type="button"

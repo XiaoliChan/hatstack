@@ -10,7 +10,7 @@ use_cache (bool), cache_dir (Path), cache_read (dict pre-loaded captures),
 cache_write(callable key->None).
 """
 
-_REGISTRY = ["blackhat", "defcon"]
+_REGISTRY = ["blackhat", "defcon", "ccc"]
 
 
 def adapters(ids: list[str] | None = None):
