@@ -10,6 +10,9 @@ on:
       confs:
         description: "space or comma separated conference ids (default: all)"
         default: ""
+      events:
+        description: "space separated event keys for batch dispatches (optional)"
+        default: ""
       refresh:
         description: "ignore cache, full re-crawl"
         type: boolean
@@ -65,9 +68,11 @@ jobs:
       - name: Crawl ${{ matrix.conf }}
         run: |
           ARGS=""
+          [ -n "$EVENTS" ] && ARGS="$ARGS --events $EVENTS"
           [ "$REFRESH" = "true" ] && ARGS="$ARGS --refresh"
           python -u -m crawler crawl --confs ${{ matrix.conf }} $ARGS --out /tmp/out
         env:
+          EVENTS: ${{ inputs.events || '' }}
           REFRESH: ${{ inputs.refresh || github.event_name == 'schedule' }}
       - name: Upload cache artifact
         if: always()
