@@ -72,14 +72,22 @@ def collect(ctx: dict) -> dict[str, dict]:
 
     for i, (key, event) in enumerate(wb_todo):
         print(f"[{i + 1}/{len(wb_todo)}] blackhat/{key} (wayback)")
-        cap = wayback_event(event)
-        _save_cache(cache_dir, key, cap)
-        captures[key] = cap
-        if cap.get("status") == "ok":
-            print(f"    ok: {cap['kind']} ({len(ds_mod.build_records(key, cap))} records, "
-                  f"{cap.get('meta', {}).get('title')})")
-        else:
-            print("    FAILED (no usable wayback capture)")
+        try:
+            cap = wayback_event(event)
+            _save_cache(cache_dir, key, cap)
+            captures[key] = cap
+            if cap.get("status") == "ok":
+                print(f"    ok: {cap['kind']} ({len(ds_mod.build_records(key, cap))} records, "
+                      f"{cap.get('meta', {}).get('title')})")
+            else:
+                print("    FAILED (no usable wayback capture)")
+        except Exception as e:
+            import traceback
+
+            traceback.print_exc()
+            print(f"    ERROR on {key}: {e!r} — continuing")
+            captures[key] = {"status": "failed",
+                             "meta": {"trace": [f"exception: {e!r}"]}}
 
     if live_todo:
         from playwright.sync_api import sync_playwright
@@ -89,13 +97,21 @@ def collect(ctx: dict) -> dict[str, dict]:
         with sync_playwright() as pw:
             for i, (key, event) in enumerate(live_todo):
                 print(f"[{i + 1}/{len(live_todo)}] blackhat/{key} (live) -> {event['urls'][0]}")
-                cap = crawl_event(pw, event)
-                _save_cache(cache_dir, key, cap)
-                captures[key] = cap
-                if cap.get("status") == "ok":
-                    print(f"    ok: {cap['kind']} ({len(ds_mod.build_records(key, cap))} records)")
-                else:
-                    print("    FAILED")
+                try:
+                    cap = crawl_event(pw, event)
+                    _save_cache(cache_dir, key, cap)
+                    captures[key] = cap
+                    if cap.get("status") == "ok":
+                        print(f"    ok: {cap['kind']} ({len(ds_mod.build_records(key, cap))} records)")
+                    else:
+                        print("    FAILED")
+                except Exception as e:
+                    import traceback
+
+                    traceback.print_exc()
+                    print(f"    ERROR on {key}: {e!r} — continuing")
+                    captures[key] = {"status": "failed",
+                                     "meta": {"trace": [f"exception: {e!r}"]}}
                 if i < len(live_todo) - 1:
                     pace()
     return captures

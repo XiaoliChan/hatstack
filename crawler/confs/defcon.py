@@ -237,7 +237,13 @@ def collect(ctx: dict) -> dict[str, dict]:
 
     for i, (key, ed) in enumerate(todo):
         print(f"[{i + 1}/{len(todo)}] defcon/{key} ({ed})")
-        cap = collect_edition(ed, log=say)
+        try:
+            cap = collect_edition(ed, log=say)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"    ERROR: {e!r} — continuing")
+            cap = {"status": "failed", "meta": {"trace": [f"exception: {e!r}"]}}
         (cache_dir / f"{key}.json").write_text(
             json.dumps(cap, ensure_ascii=False), encoding="utf-8"
         )

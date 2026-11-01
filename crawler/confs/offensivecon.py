@@ -111,7 +111,13 @@ def collect(ctx: dict) -> dict[str, dict]:
 
     for i, (key, year) in enumerate(todo):
         print(f"[{i + 1}/{len(todo)}] offensivecon/{key}")
-        cap = collect_year(year, log=say)
+        try:
+            cap = collect_year(year, log=say)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"    ERROR: {e!r} — continuing")
+            cap = {"status": "failed", "meta": {"trace": [f"exception: {e!r}"]}}
         (cache_dir / f"{key}.json").write_text(
             json.dumps(cap, ensure_ascii=False), encoding="utf-8"
         )
