@@ -17,6 +17,7 @@ from crawler.dataset import atomic_write_json
 
 ID = "hitcon"
 NAME = "HITCON"
+DESCRIPTION = "Taiwan's flagship hacker conference, running since 2005."
 URL = "https://hitcon.org/"
 YEARS = [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016]
 

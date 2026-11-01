@@ -15,6 +15,7 @@ from crawler.render import rendered_html
 
 ID = "kcon"
 NAME = "KCon"
+DESCRIPTION = "Knownsec's KCon hacker conference in China, since 2012."
 URL = "https://kcon.knownsec.com/"
 URLS = ["https://kcon.knownsec.com/", "https://kcon.knownsec.com/agenda"]
 

@@ -15,6 +15,7 @@ from crawler.render import rendered_html
 
 ID = "x33fcon"
 NAME = "x33fcon"
+DESCRIPTION = "Polish conference for red teamers and exploit developers."
 URL = "https://x33fcon.com/"
 BASE = "https://x33fcon.com/"
 

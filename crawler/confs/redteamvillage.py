@@ -16,6 +16,7 @@ from crawler.render import rendered_html
 
 ID = "redteamvillage"
 NAME = "Red Team Village"
+DESCRIPTION = "DEF CON Red Team Village - red teaming talks and workshops."
 URL = "https://redteamvillage.org/"
 URLS = ["https://redteamvillage.org/", "https://redteamvillage.org/talks/"]
 

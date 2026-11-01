@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react"
-import { FilterSidebar, type Filters } from "@/components/FilterSidebar"
+import { FilterSidebar, type EditionGroup, type Filters } from "@/components/FilterSidebar"
 import { ResultRow } from "@/components/ResultRow"
 import { SearchBox } from "@/components/SearchBox"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { buildIndex, queryTerms, runSearch } from "@/lib/search"
-import { conferenceList, metaOf, type Dataset } from "@/lib/types"
+import { conferenceList, editionKey, metaOf, type Dataset } from "@/lib/types"
 
 const PAGE = 50
 
@@ -15,7 +15,7 @@ export default function App() {
     () => new URLSearchParams(window.location.search).get("q") ?? ""
   )
   const [debounced, setDebounced] = useState(query)
-  const [filters, setFilters] = useState<Filters>({ confs: new Set(), regions: new Set(), years: new Set() })
+  const [filters, setFilters] = useState<Filters>({ edition: null })
   const [page, setPage] = useState(1)
   const [showFilters, setShowFilters] = useState(false)
 
@@ -50,41 +50,52 @@ export default function App() {
   const index = useMemo(() => (dataset ? buildIndex(dataset.sessions) : null), [dataset])
   const meta = useMemo(() => (dataset ? metaOf(dataset) : null), [dataset])
 
-  const oldestIndividual = useMemo(() => {
-    if (!meta || !meta.years.length) return 2015
-    const distinct = meta.years.length
-    return distinct > 14 ? meta.years[13] : Math.min(meta.years[0] - 1, meta.years[meta.years.length - 1])
-  }, [meta])
-
-  const facets = useMemo(() => {
-    const confCounts: Record<string, number> = {}
-    const regionCounts: Record<string, number> = {}
-    const yearCounts: Record<string, number> = {}
-    for (const s of dataset?.sessions ?? []) {
-      const c = s.conference ?? "blackhat"
-      confCounts[c] = (confCounts[c] ?? 0) + 1
-      regionCounts[s.event.region] = (regionCounts[s.event.region] ?? 0) + 1
-      if (s.event.year > 0) {
-        const bucket = s.event.year >= oldestIndividual ? String(s.event.year) : "old"
-        yearCounts[bucket] = (yearCounts[bucket] ?? 0) + 1
-      }
+  const groups = useMemo<EditionGroup[]>(() => {
+    if (!dataset) return []
+    const confs = conferenceList(dataset)
+    const byConf = new Map<string, Map<string, { label: string; count: number }>>()
+    const regionsPerConf = new Map<string, Set<string>>()
+    const totals = new Map<string, number>()
+    for (const s of dataset.sessions) {
+      const conf = s.conference ?? "blackhat"
+      totals.set(conf, (totals.get(conf) ?? 0) + 1)
+      const regions = regionsPerConf.get(conf) ?? new Set()
+      regions.add(s.event.region)
+      regionsPerConf.set(conf, regions)
+      const key = editionKey(s)
+      const m = byConf.get(conf) ?? new Map()
+      const cur = m.get(key)
+      if (cur) cur.count += 1
+      else m.set(key, { label: "", count: 1 })
+      byConf.set(conf, m)
     }
-    return { confCounts, regionCounts, yearCounts }
-  }, [dataset, oldestIndividual])
+    return confs
+      .filter((c) => (totals.get(c.id) ?? 0) > 0)
+      .map((c) => {
+        const multiRegion = (regionsPerConf.get(c.id)?.size ?? 0) > 1
+        const editions = [...(byConf.get(c.id)?.entries() ?? [])]
+          .map(([key, v]) => {
+            const [, region, yearStr] = key.split("|")
+            const year = Number(yearStr)
+            const regionTag = multiRegion ? region.toUpperCase() : null
+            const label =
+              year > 0 ? [regionTag, year].filter(Boolean).join("-") : [regionTag, "unknown"].filter(Boolean).join("-")
+            return { key, label, count: v.count }
+          })
+          .sort((a, b) => a.label.localeCompare(b.label))
+        return { conf: c, editions, count: totals.get(c.id) ?? 0 }
+      })
+  }, [dataset])
 
   const results = useMemo(() => {
     if (!dataset || !index) return []
+    const edition = filters.edition
     const allowed = new Set(
       dataset.sessions
         .filter((s) => {
-          if (filters.confs.size && !filters.confs.has(s.conference ?? "blackhat")) return false
-          if (filters.regions.size && !filters.regions.has(s.event.region)) return false
-          if (filters.years.size) {
-            if (s.event.year <= 0) return false // unknown year: excluded from any year filter
-            const bucket = s.event.year >= oldestIndividual ? String(s.event.year) : "old"
-            if (!filters.years.has(bucket)) return false
-          }
-          return true
+          if (!edition) return true
+          if (!edition.includes("|")) return (s.conference ?? "blackhat") === edition
+          return editionKey(s) === edition
         })
         .map((s) => s.id)
     )
@@ -98,7 +109,7 @@ export default function App() {
 
   const terms = useMemo(() => new Set(queryTerms(debounced)), [debounced])
 
-  const filtersActive = filters.confs.size > 0 || filters.regions.size > 0 || filters.years.size > 0
+  const filtersActive = filters.edition !== null
   const showResults = debounced !== "" || filtersActive
 
   const SUGGESTIONS = ["kerberos", "active directory", "windows kernel", "dns", "zero-day", "supply chain"]
@@ -162,12 +173,7 @@ export default function App() {
             <FilterSidebar
               filters={filters}
               setFilters={setFilters}
-              conferences={dataset ? conferenceList(dataset) : []}
-              confCounts={facets.confCounts}
-              regionCounts={facets.regionCounts}
-              years={meta.years}
-              yearCounts={facets.yearCounts}
-              oldestIndividualYear={oldestIndividual}
+              groups={groups}
               resultCount={results.length}
               total={meta.total}
               className={`${showFilters ? "block mb-6" : "hidden"} lg:block lg:sticky lg:top-6 lg:self-start`}
@@ -219,7 +225,7 @@ export default function App() {
                   className="mt-2 underline underline-offset-4 hover:text-foreground"
                   onClick={() => {
                     setQuery("")
-                    setFilters({ confs: new Set(), regions: new Set(), years: new Set() })
+                    setFilters({ edition: null })
                   }}
                 >
                   reset search and filters

@@ -21,6 +21,7 @@ export interface ConferenceInfo {
   id: string
   name: string
   url: string | null
+  description?: string | null
 }
 
 export interface Dataset {
@@ -33,8 +34,14 @@ export interface Dataset {
  * map below is only a fallback for older datasets / unknown ids */
 export function conferenceList(ds: Dataset): ConferenceInfo[] {
   return (ds.conferences ?? ["blackhat"]).map((c) =>
-    typeof c === "string" ? { id: c, name: CONF_NAMES[c] ?? c, url: null } : c
+    typeof c === "string"
+      ? { id: c, name: CONF_NAMES[c] ?? c, url: null, description: null }
+      : { description: null, ...c }
   )
+}
+
+export function editionKey(s: { conference?: string; event: { region: string; year: number } }): string {
+  return `${s.conference ?? "blackhat"}|${s.event.region}|${s.event.year}`
 }
 
 export const CONF_NAMES: Record<string, string> = {

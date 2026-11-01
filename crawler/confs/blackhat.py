@@ -10,6 +10,7 @@ from crawler.wayback import wayback_event, wayback_inventory
 
 ID = "blackhat"
 NAME = "Black Hat"
+DESCRIPTION = "Information security conference series with US, Europe and Asia editions, running since 1997."
 URL = "https://www.blackhat.com/"
 WAYBACK_MAX_YEAR = 2025  # <=2025: wayback only (no Cloudflare); >=2026: live
 

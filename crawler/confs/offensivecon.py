@@ -18,6 +18,7 @@ from crawler.dataset import atomic_write_json
 
 ID = "offensivecon"
 NAME = "OffensiveCon"
+DESCRIPTION = "Berlin conference focused on offensive security and exploit development, since 2018."
 URL = "https://www.offensivecon.org/"
 BASE = "https://www.offensivecon.org"
 YEARS = [2025, 2024, 2023, 2022, 2020]  # live pages; 2018/2019/2021 404

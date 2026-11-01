@@ -19,6 +19,7 @@ from crawler.dataset import atomic_write_json
 
 ID = "usenix"
 NAME = "USENIX Security"
+DESCRIPTION = "USENIX Security Symposium - top-tier academic security research, since 1994."
 URL = "https://www.usenix.org/conference/byname/153"
 BASE = "https://www.usenix.org"
 YEARS = [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015]

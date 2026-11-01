@@ -20,6 +20,7 @@ from crawler.dataset import atomic_write_json
 
 ID = "ccc"
 NAME = "CCC"
+DESCRIPTION = "Chaos Communication Congress - the Chaos Computer Club's annual congress, Europe's largest hacker gathering, since 1984."
 URL = "https://www.ccc.de/"
 API = "https://api.media.ccc.de/public"
 

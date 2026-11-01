@@ -21,6 +21,7 @@ from crawler.dataset import atomic_write_json
 
 ID = "defcon"
 NAME = "DEF CON"
+DESCRIPTION = "The world's largest hacker convention, held annually in Las Vegas since 1993."
 URL = "https://defcon.org/"
 BASE = "https://media.defcon.org/"
 
