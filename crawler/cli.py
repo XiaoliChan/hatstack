@@ -11,6 +11,12 @@ from . import dataset as ds_mod
 from . import events as ev_mod
 from .capture import crawl_event, fetch_inventory, pace
 
+
+def _prepare_inventory(inventory: dict[str, dict]) -> dict[str, dict]:
+    """Inventory links only the /archive/ canonical path (hard-blocked);
+    merge generative microsite candidates into every event."""
+    return ev_mod.merge_candidates(inventory) if inventory else dict(ev_mod.fallback_events())
+
 BASE = Path(__file__).resolve().parent
 DEFAULT_CACHE = BASE / "cache"
 
@@ -47,10 +53,10 @@ def cmd_crawl(args) -> int:
             if html:
                 inventory = ev_mod.parse_inventory(html)
                 print(f"inventory: {len(inventory)} events from archives.html")
-                pace(10, 15)
-        if not inventory:
-            print("inventory unavailable -> generative fallback map")
-            inventory = dict(ev_mod.fallback_events())
+            else:
+                print("inventory unavailable -> generative fallback map")
+            pace(10, 15)
+        inventory = _prepare_inventory(inventory)
 
         wanted = set(args.events) if args.events else None
         todo = []

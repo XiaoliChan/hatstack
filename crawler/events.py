@@ -88,10 +88,7 @@ def parse_inventory(html: str) -> dict[str, dict]:
     # within JSON-era, microsite paths first: /archive/ HTML navigations are
     # hard-blocked by Cloudflare even in fresh browsers (probe + smoke evidence)
     for ev in events.values():
-        ev["urls"].sort(
-            key=lambda u: (0 if (ev["kinds"][u] == "json" and "/archive/" not in u)
-                           else 1 if ev["kinds"][u] == "json" else 2)
-        )
+        _sort_urls(ev)
     return events
 
 
@@ -108,6 +105,31 @@ def url_candidates(region: str, year: int) -> list[str]:
         f"https://www.blackhat.com/{region}-{yy}/archives.html",
     ]
     return legacy
+
+
+def _sort_urls(ev: dict):
+    """Microsite JSON first (Cloudflare hard-blocks /archive/ navigations),
+    then /archive/ JSON, then legacy static pages."""
+    ev["urls"].sort(
+        key=lambda u: (
+            0 if (ev["kinds"][u] == "json" and "/archive/" not in u)
+            else 1 if ev["kinds"][u] == "json"
+            else 2
+        )
+    )
+
+
+def merge_candidates(inventory: dict[str, dict]) -> dict[str, dict]:
+    """Ensure every inventory event also carries the generative candidate URLs
+    (microsite paths) — archives.html only links the /archive/ canonical path,
+    which is exactly the path Cloudflare hard-blocks for navigation."""
+    for key, ev in inventory.items():
+        for u in url_candidates(ev["region"], ev["year"]):
+            if u not in ev["urls"]:
+                ev["urls"].append(u)
+                ev["kinds"][u] = "json" if u.endswith("schedule/index.html") else "legacy"
+        _sort_urls(ev)
+    return inventory
 
 
 def fallback_events() -> dict[str, dict]:

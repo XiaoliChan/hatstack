@@ -1,5 +1,11 @@
 from crawler.dataset import build_dataset, build_report
-from crawler.events import fallback_events, normalize_region, parse_inventory, url_candidates
+from crawler.events import (
+    fallback_events,
+    merge_candidates,
+    normalize_region,
+    parse_inventory,
+    url_candidates,
+)
 
 
 def test_normalize_region():
@@ -48,6 +54,21 @@ def test_url_candidates_order():
     assert url_candidates("eu", 2020)[1] == (
         "https://www.blackhat.com/archive/europe/2020/briefings/schedule/index.html"
     )
+
+
+def test_merge_candidates_adds_microsites_to_archive_only_events():
+    # archives.html links only the /archive/ path (hard-blocked for nav);
+    # merge_candidates must inject the microsite URL BEFORE it
+    inv = parse_inventory(
+        '<a href="../archive/asia/2026/briefings/schedule/">asia 26</a>'
+    )
+    ev = inv["asia-2026"]
+    assert ev["urls"] == ["https://www.blackhat.com/archive/asia/2026/briefings/schedule/"]
+    merged = merge_candidates(inv)["asia-2026"]
+    assert merged["urls"][0] == (
+        "https://www.blackhat.com/asia-26/briefings/schedule/index.html"
+    )
+    assert "https://www.blackhat.com/archive/asia/2026/briefings/schedule/" in merged["urls"]
 
 
 def test_fallback_events_coverage():
