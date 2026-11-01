@@ -99,6 +99,8 @@ def test_dataset_and_report():
         },
         "eu-2020": {"status": "failed"},
     }
+    ds = build_dataset({"blackhat": caps})
+
     # partial-run merge: defcon-only run must keep prior blackhat sessions
     prior_bh = [dict(r, conference="blackhat") for r in ds["sessions"]]
     ds2 = build_dataset(
@@ -115,8 +117,6 @@ def test_dataset_and_report():
     # re-crawling a conference replaces its prior sessions
     ds3 = build_dataset({"blackhat": caps}, prior_sessions=prior_bh)
     assert {s["conference"] for s in ds3["sessions"]} == {"blackhat"}
-
-    ds = build_dataset({"blackhat": caps})
     ids = [s["id"] for s in ds["sessions"]]
     assert len(ids) == len(set(ids))  # deduped
     years = {s["event"]["year"] for s in ds["sessions"]}
