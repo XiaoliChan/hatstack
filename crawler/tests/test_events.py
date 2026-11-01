@@ -12,7 +12,7 @@ def test_normalize_region():
 
 def test_parse_inventory_patterns():
     html = """
-    <a href="/archive/usa/2025/briefings/schedule/index.html">US 2025</a>
+    <a href="../archive/usa/2025/briefings/schedule/index.html">US 2025</a>
     <a href="/archive/europe/2023/briefings/schedule/index.html">EU 2023</a>
     <a href="/us-18/briefings/schedule/">US 18</a>
     <a href="/us-16/briefings.html">US 16</a>
@@ -20,9 +20,12 @@ def test_parse_inventory_patterns():
     <a href="/bh-usa-97/">USA 97</a>
     <a href="/archive/europe/2010/">EU 2010</a>
     <a href="/archive/sector/2024/briefings/schedule/index.html">skip me</a>
+    <a href="https://www.blackhat.com/us-26/briefings/schedule/index.html">US 26</a>
     """
     inv = parse_inventory(html)
-    assert "us-2025" in inv and inv["us-2025"]["kinds"][inv["us-2025"]["urls"][0]] == "json"
+    # relative ../archive links resolve against the archives page
+    assert "https://www.blackhat.com/archive/usa/2025/briefings/schedule/index.html" in inv["us-2025"]["urls"]
+    assert inv["us-2025"]["kinds"][inv["us-2025"]["urls"][0]] == "json"
     assert "eu-2023" in inv
     assert "us-2018" in inv
     assert "us-2016" in inv and all(k == "legacy" for k in inv["us-2016"]["kinds"].values())

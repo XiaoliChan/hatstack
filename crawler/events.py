@@ -6,7 +6,11 @@ Mainline regions only (us/eu/asia), all years. Recent years are JSON-era
 from __future__ import annotations
 
 import re
+from urllib.parse import urljoin
+
 from bs4 import BeautifulSoup
+
+ARCHIVES_BASE = "https://www.blackhat.com/html/archives.html"
 
 LONG_REGION = {"us": "usa", "eu": "europe", "asia": "asia"}
 
@@ -72,8 +76,7 @@ def parse_inventory(html: str) -> dict[str, dict]:
                 region, year = "eu", int(m.group(1))
             if not region or not year or year < 1997:
                 continue
-            url = href if href.startswith("http") else f"https://www.blackhat.com{href}"
-            url = url.split("#")[0]
+            url = urljoin(ARCHIVES_BASE, href).split("#")[0]
             key = f"{region}-{year}"
             ev = events.setdefault(
                 key, {"region": region, "year": year, "urls": [], "kinds": {}}
