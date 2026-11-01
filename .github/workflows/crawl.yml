@@ -63,7 +63,9 @@ jobs:
           [ -n "$EVENTS" ] && ARGS="$ARGS --events $EVENTS"
           [ -n "$CONFS" ] && ARGS="$ARGS --confs $CONFS"
           [ "$REFRESH" = "true" ] && ARGS="$ARGS --refresh"
-          python -m crawler crawl --out dataset $ARGS
+          # -u: unbuffered stdout — a hard crash must never swallow the last
+          # log lines (that is exactly how the eu-2018 death went undiagnosed)
+          python -u -m crawler crawl --out dataset $ARGS
         env:
           LIMIT: ${{ inputs.limit || '0' }}
           EVENTS: ${{ inputs.events || '' }}

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import faulthandler
 import json
 import sys
 import time
@@ -9,6 +10,10 @@ from pathlib import Path
 
 from crawler import confs
 from crawler import dataset as ds_mod
+
+# C-level crashes (lxml/openssl aborts) bypass Python's exception printing and
+# can take the stdout buffer with them — enable core-style tracebacks now.
+faulthandler.enable()
 
 BASE = Path(__file__).resolve().parent
 DEFAULT_CACHE = BASE / "cache"
