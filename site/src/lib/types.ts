@@ -6,6 +6,7 @@ export interface Speaker {
 
 export interface Session {
   id: string
+  conference?: string
   event: { region: "us" | "eu" | "asia"; year: number; label: string }
   title: string
   speakers: Speaker[]
@@ -18,7 +19,20 @@ export interface Session {
 
 export interface Dataset {
   version: string
+  conferences?: string[]
   sessions: Session[]
+}
+
+export const CONF_NAMES: Record<string, string> = {
+  blackhat: "Black Hat",
+  defcon: "DEF CON",
+  ccc: "CCC",
+  usenix: "USENIX",
+}
+
+export function confName(id?: string): string {
+  if (!id) return "Black Hat"
+  return CONF_NAMES[id] ?? id
 }
 
 export interface DatasetMeta {
@@ -26,6 +40,7 @@ export interface DatasetMeta {
   withMaterials: number
   years: number[]
   oldestYear: number
+  conferences: string[]
 }
 
 export function metaOf(ds: Dataset): DatasetMeta {
@@ -35,5 +50,6 @@ export function metaOf(ds: Dataset): DatasetMeta {
     withMaterials: ds.sessions.filter((s) => s.files.slides || s.files.whitepaper).length,
     years,
     oldestYear: years[years.length - 1] ?? 0,
+    conferences: [...new Set(ds.sessions.map((s) => s.conference ?? "blackhat"))],
   }
 }

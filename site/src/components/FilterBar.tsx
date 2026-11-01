@@ -1,3 +1,4 @@
+import { confName } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 function Chip({
@@ -30,6 +31,7 @@ function Chip({
 }
 
 export interface Filters {
+  confs: Set<string>
   regions: Set<string>
   years: Set<string> // "2024" … or "old" for the long tail
 }
@@ -39,6 +41,7 @@ export function FilterBar({
   setFilters,
   years,
   oldestIndividualYear,
+  conferences,
   resultCount,
   total,
 }: {
@@ -46,6 +49,7 @@ export function FilterBar({
   setFilters: (f: Filters) => void
   years: number[]
   oldestIndividualYear: number
+  conferences: string[]
   resultCount: number
   total: number
 }) {
@@ -55,10 +59,28 @@ export function FilterBar({
     else next.add(v)
     return next
   }
-  const hasActive = filters.regions.size > 0 || filters.years.size > 0
+  const hasActive = filters.confs.size > 0 || filters.regions.size > 0 || filters.years.size > 0
 
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+      {conferences.length > 1 && (
+        <>
+          <div className="flex gap-1.5" role="group" aria-label="Filter by conference">
+            {conferences.map((c) => (
+              <Chip
+                key={c}
+                active={filters.confs.has(c)}
+                onClick={() => setFilters({ ...filters, confs: toggle(filters.confs, c) })}
+              >
+                {confName(c)}
+              </Chip>
+            ))}
+          </div>
+          <span className="text-line select-none" aria-hidden>
+            |
+          </span>
+        </>
+      )}
       <div className="flex gap-1.5" role="group" aria-label="Filter by region">
         {(["us", "eu", "asia"] as const).map((r) => (
           <Chip
@@ -103,7 +125,7 @@ export function FilterBar({
           <button
             type="button"
             className="ml-3 underline underline-offset-4 hover:text-foreground"
-            onClick={() => setFilters({ regions: new Set(), years: new Set() })}
+            onClick={() => setFilters({ confs: new Set(), regions: new Set(), years: new Set() })}
           >
             reset
           </button>

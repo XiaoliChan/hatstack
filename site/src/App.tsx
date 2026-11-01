@@ -15,7 +15,7 @@ export default function App() {
     () => new URLSearchParams(window.location.search).get("q") ?? ""
   )
   const [debounced, setDebounced] = useState(query)
-  const [filters, setFilters] = useState<Filters>({ regions: new Set(), years: new Set() })
+  const [filters, setFilters] = useState<Filters>({ confs: new Set(), regions: new Set(), years: new Set() })
   const [visible, setVisible] = useState(PAGE)
   const sentinel = useRef<HTMLDivElement>(null)
 
@@ -59,6 +59,7 @@ export default function App() {
     const allowed = new Set(
       dataset.sessions
         .filter((s) => {
+          if (filters.confs.size && !filters.confs.has(s.conference ?? "blackhat")) return false
           if (filters.regions.size && !filters.regions.has(s.event.region)) return false
           if (filters.years.size) {
             const bucket =
@@ -79,7 +80,7 @@ export default function App() {
 
   const terms = useMemo(() => new Set(queryTerms(debounced)), [debounced])
 
-  const filtersActive = filters.regions.size > 0 || filters.years.size > 0
+  const filtersActive = filters.confs.size > 0 || filters.regions.size > 0 || filters.years.size > 0
   const showResults = debounced !== "" || filtersActive
 
   const SUGGESTIONS = ["kerberos", "active directory", "windows kernel", "dns", "zero-day", "supply chain"]
@@ -139,6 +140,7 @@ export default function App() {
               setFilters={setFilters}
               years={meta.years}
               oldestIndividualYear={oldestIndividual}
+              conferences={meta.conferences}
               resultCount={results.length}
               total={meta.total}
             />
@@ -190,7 +192,7 @@ export default function App() {
                 className="mt-2 underline underline-offset-4 hover:text-foreground"
                 onClick={() => {
                   setQuery("")
-                  setFilters({ regions: new Set(), years: new Set() })
+                  setFilters({ confs: new Set(), regions: new Set(), years: new Set() })
                 }}
               >
                 reset search and filters

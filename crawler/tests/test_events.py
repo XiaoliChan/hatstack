@@ -99,15 +99,17 @@ def test_dataset_and_report():
         },
         "eu-2020": {"status": "failed"},
     }
-    ds = build_dataset(caps)
+    ds = build_dataset({"blackhat": caps})
     ids = [s["id"] for s in ds["sessions"]]
     assert len(ids) == len(set(ids))  # deduped
     years = {s["event"]["year"] for s in ds["sessions"]}
     assert years == {2016, 2024}
+    assert all(s["conference"] == "blackhat" for s in ds["sessions"])
+    assert ds["conferences"] == ["blackhat"]
     # newest first
     assert ds["sessions"][0]["event"]["year"] == 2024
 
-    md, rep = build_report(caps, ds)
-    assert "| us-2024 | ok | json |" in md
-    assert "| eu-2020 | failed |" in md
-    assert rep["events"]["us-2016"]["sessions"] > 80
+    md, rep = build_report({"blackhat": caps}, ds)
+    assert "| blackhat/us-2024 | ok | json |" in md
+    assert "| blackhat/eu-2020 | failed |" in md
+    assert rep["events"]["blackhat/us-2016"]["sessions"] > 80
