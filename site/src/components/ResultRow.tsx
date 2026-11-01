@@ -34,6 +34,10 @@ export function ResultRow({ s, terms }: { s: Session; terms: Set<string> }) {
     .map((p) => (p.company ? `${p.name} (${p.company})` : p.name))
     .join("; ")
   const long = s.abstract.length > 320
+  const yy = String(s.event.year).slice(2)
+  const badge = s.event.year > 0 && !s.event.label.includes(yy)
+    ? `${s.event.label} · ${s.event.year}`
+    : s.event.label
 
   return (
     <article className="py-5 border-b border-line">
