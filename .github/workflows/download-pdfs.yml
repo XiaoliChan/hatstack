@@ -1,0 +1,45 @@
+name: Download PDFs
+
+# The repo's original purpose, preserved: bulk-download presentation files
+# for one event (or all) from the crawled dataset and ship them as an artifact.
+
+on:
+  workflow_dispatch:
+    inputs:
+      event:
+        description: "event label, e.g. US-24 (empty = all events)"
+        default: ""
+      types:
+        description: "file types to include"
+        default: "slides,whitepaper"
+        options:
+          - slides
+          - slides,whitepaper
+          - slides,whitepaper,tool
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: Download files
+        run: |
+          ARGS="--types $TYPES --dest save --dataset dataset/dataset.json"
+          [ -n "$EVENT" ] && ARGS="$ARGS --event $EVENT"
+          python -m crawler download $ARGS
+        env:
+          EVENT: ${{ inputs.event }}
+          TYPES: ${{ inputs.types }}
+      - name: Tar
+        run: tar -zcf BlackHat-PDF.tar.gz -C save .
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlackHat-PDF-${{ inputs.event || 'all' }}
+          path: BlackHat-PDF.tar.gz
+          retention-days: 14

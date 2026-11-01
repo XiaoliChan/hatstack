@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #fafaf9;
+  --foreground: #141413;
+  --muted-foreground: #5f5e5b;
+  --abstract: #3b3a38;
+  --border: #e4e2de;
+  --line: #e7e5e1;
+  --mark-bg: #141413;
+  --mark-fg: #fafaf9;
+  --primary: #141413;
+  --primary-foreground: #fafaf9;
+  --accent: #edecea;
+  --accent-foreground: #141413;
+  --input: #cfcdc8;
+  --ring: #141413;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #f5f5f4;
+  --muted-foreground: #a3a3a3;
+  --abstract: #c9c9c7;
+  --border: #262626;
+  --line: #232323;
+  --mark-bg: #f5f5f4;
+  --mark-fg: #0a0a0a;
+  --primary: #f5f5f4;
+  --primary-foreground: #0a0a0a;
+  --accent: #1a1a1a;
+  --accent-foreground: #f5f5f4;
+  --input: #2e2e2e;
+  --ring: #f5f5f4;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-abstract: var(--abstract);
+  --color-border: var(--border);
+  --color-line: var(--line);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  background: var(--background);
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+}
+
+mark {
+  background: var(--mark-bg);
+  color: var(--mark-fg);
+  padding: 0 0.2em;
+  border-radius: 2px;
+}
+
+::selection {
+  background: var(--mark-bg);
+  color: var(--mark-fg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
