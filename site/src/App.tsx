@@ -20,7 +20,9 @@ export default function App() {
   const sentinel = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}dataset.json`)
+    // cache-bust: Pages caches dataset.json ~10min and stale data after a
+    // crawl deploy is the single most confusing failure for visitors
+    fetch(`${import.meta.env.BASE_URL}dataset.json?t=${Date.now()}`)
       .then((r) => {
         if (!r.ok) throw new Error(String(r.status))
         return r.json()
