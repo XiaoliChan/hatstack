@@ -17,10 +17,24 @@ export interface Session {
   source_url: string | null
 }
 
+export interface ConferenceInfo {
+  id: string
+  name: string
+  url: string | null
+}
+
 export interface Dataset {
   version: string
-  conferences?: string[]
+  conferences?: (string | ConferenceInfo)[]
   sessions: Session[]
+}
+
+/** manifest comes from the crawler adapters via dataset.json; the builtin
+ * map below is only a fallback for older datasets / unknown ids */
+export function conferenceList(ds: Dataset): ConferenceInfo[] {
+  return (ds.conferences ?? ["blackhat"]).map((c) =>
+    typeof c === "string" ? { id: c, name: CONF_NAMES[c] ?? c, url: null } : c
+  )
 }
 
 export const CONF_NAMES: Record<string, string> = {

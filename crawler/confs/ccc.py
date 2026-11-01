@@ -20,6 +20,7 @@ from crawler.dataset import atomic_write_json
 
 ID = "ccc"
 NAME = "CCC"
+URL = "https://www.ccc.de/"
 API = "https://api.media.ccc.de/public"
 
 _SERIES_RES = [

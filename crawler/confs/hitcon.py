@@ -17,6 +17,7 @@ from crawler.dataset import atomic_write_json
 
 ID = "hitcon"
 NAME = "HITCON"
+URL = "https://hitcon.org/"
 YEARS = [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016]
 
 _SKIP_RE = re.compile(r"^(報到|開幕|閉幕|Break|break|Lunch|Tea|Closing|Opening)", )

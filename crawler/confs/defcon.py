@@ -21,6 +21,7 @@ from crawler.dataset import atomic_write_json
 
 ID = "defcon"
 NAME = "DEF CON"
+URL = "https://defcon.org/"
 BASE = "https://media.defcon.org/"
 
 _EDITION_RE = re.compile(r"^DEF CON (\d+)/?$")  # autoindex entries carry a trailing slash

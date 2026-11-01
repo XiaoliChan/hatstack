@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils"
-import { confName } from "@/lib/types"
+import { confName, type ConferenceInfo } from "@/lib/types"
 
 export interface Filters {
   confs: Set<string>
@@ -77,7 +77,7 @@ export function FilterSidebar({
 }: {
   filters: Filters
   setFilters: (f: Filters) => void
-  conferences: string[]
+  conferences: ConferenceInfo[]
   confCounts: Record<string, number>
   regionCounts: Record<string, number>
   years: number[]
@@ -109,13 +109,31 @@ export function FilterSidebar({
           onAll={() => setFilters({ ...filters, confs: new Set() })}
         >
           {conferences.map((c) => (
-            <Row
-              key={c}
-              active={filters.confs.has(c)}
-              label={confName(c)}
-              count={confCounts[c] ?? 0}
-              onClick={() => setFilters({ ...filters, confs: toggle(filters.confs, c) })}
-            />
+            <div key={c.id} className="flex items-center gap-1 group/row">
+              <div className="flex-1 min-w-0">
+                <Row
+                  active={filters.confs.has(c.id)}
+                  label={c.name}
+                  count={confCounts[c.id] ?? 0}
+                  onClick={() => setFilters({ ...filters, confs: toggle(filters.confs, c.id) })}
+                />
+              </div>
+              {c.url && (
+                <a
+                  href={c.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={`${c.name} official site`}
+                  className="shrink-0 p-1.5 text-muted-foreground/0 group-hover/row:text-muted-foreground hover:!text-foreground transition-colors"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <path d="M15 3h6v6" />
+                    <path d="M10 14 21 3" />
+                  </svg>
+                </a>
+              )}
+            </div>
           ))}
         </Group>
       )}

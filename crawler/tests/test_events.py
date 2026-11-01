@@ -122,7 +122,8 @@ def test_dataset_and_report():
     years = {s["event"]["year"] for s in ds["sessions"]}
     assert years == {2016, 2024}
     assert all(s["conference"] == "blackhat" for s in ds["sessions"])
-    assert ds["conferences"] == ["blackhat"]
+    assert [c["id"] for c in ds["conferences"]] == ["blackhat"]
+    assert ds["conferences"][0]["url"] == "https://www.blackhat.com/"
     # newest first
     assert ds["sessions"][0]["event"]["year"] == 2024
 

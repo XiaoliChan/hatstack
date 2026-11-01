@@ -15,6 +15,7 @@ from crawler.render import rendered_html
 
 ID = "x33fcon"
 NAME = "x33fcon"
+URL = "https://x33fcon.com/"
 BASE = "https://x33fcon.com/"
 
 

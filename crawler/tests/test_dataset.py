@@ -74,7 +74,7 @@ def test_prior_sessions_get_conference_backfilled():
     ds = build_dataset({"defcon": {"dc-33": _capture(_records("defcon", "us", 2025))}}, prior)
     old = next(r for r in ds["sessions"] if r["id"] == "us24-1")
     assert old["conference"] == "blackhat"
-    assert "blackhat" in ds["conferences"]
+    assert any(c["id"] == "blackhat" for c in ds["conferences"])
 
 
 def test_use_cache_run_with_empty_adapters_keeps_everything():

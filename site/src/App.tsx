@@ -4,7 +4,7 @@ import { ResultRow } from "@/components/ResultRow"
 import { SearchBox } from "@/components/SearchBox"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { buildIndex, queryTerms, runSearch } from "@/lib/search"
-import { metaOf, type Dataset } from "@/lib/types"
+import { conferenceList, metaOf, type Dataset } from "@/lib/types"
 
 const PAGE = 50
 
@@ -162,7 +162,7 @@ export default function App() {
             <FilterSidebar
               filters={filters}
               setFilters={setFilters}
-              conferences={meta.conferences}
+              conferences={dataset ? conferenceList(dataset) : []}
               confCounts={facets.confCounts}
               regionCounts={facets.regionCounts}
               years={meta.years}
