@@ -60,7 +60,9 @@ def build_report(captures: dict[str, dict], dataset: dict) -> tuple[str, dict]:
     for key in sorted(captures, key=lambda k: (-int(k.split("-")[1]), k)):
         cap = captures[key]
         meta = cap.get("meta", {})
-        note = cap.get("error") or (f"li={cap.get('rendered_li')}" if cap.get("kind") == "json" else "")
+        trace = meta.get("trace") or []
+        base_note = f"li={cap.get('rendered_li')}" if cap.get("kind") == "json" else ""
+        note = (base_note + " | " + trace[-1]) if trace else base_note
         lines.append(
             f"| {key} | {cap.get('status','?')} | {cap.get('kind','-')} | {per_event.get(key, 0)} | {note} |"
         )

@@ -103,55 +103,69 @@ def page_candidates(event: dict) -> list[str]:
 def wayback_event(event: dict) -> dict:
     """Best-effort wayback capture for one event. JSON era prefers sessions.json."""
     year = event["year"]
+    key = f"{event['region']}-{year}"
     json_era = year >= 2018
+    trace: list[str] = []
+
+    def say(line: str):
+        print(f"    {line}")
+        trace.append(line)
+
     try_orders = json_candidates(event) if json_era else []
-    if json_era and year == 2018 and event["region"] == "us":
-        pass  # microsite variant first already covers us-18
     for url in try_orders:
         ts = cdx_newest(url)
         if not ts:
+            say(f"cdx miss: {url}")
             continue
         body = wayback_get(url, ts)
         if not body:
+            say(f"cdx {ts} fetch failed: {url}")
             continue
+        say(f"cdx {ts} {len(body)}B: {url}")
         try:
             data = json.loads(body)
-        except Exception:
+        except Exception as e:
+            say(f"json invalid ({e!r}), next candidate")
             continue
         if not isinstance(data, dict) or not data.get("sessions"):
+            say("json has no sessions, next candidate")
             continue
+        n = len(data.get("sessions") or {})
+        say(f"OK json ({n} sessions) from {ts}")
         return {
             "status": "ok",
             "kind": "json",
             "region": event["region"],
             "year": year,
             "data": data,
-            "meta": {"source": "wayback", "url": url, "kind": "json", "title": f"wayback {ts}"},
+            "meta": {"source": "wayback", "url": url, "kind": "json",
+                     "title": f"wayback {ts}", "trace": trace},
         }
     for url in page_candidates(event):
         ts = cdx_newest(url)
         if not ts:
+            say(f"cdx miss: {url}")
             continue
         body = wayback_get(url, ts)
         if not body:
+            say(f"cdx {ts} fetch failed: {url}")
             continue
         html = body.decode("utf-8", "replace")
+        say(f"cdx {ts} {len(html)}B page: {url} (pdfs: {html.lower().count('.pdf')})")
         if ".pdf" not in html.lower():
             continue
-        kind = "legacy"
-        if json_era:
-            # schedule shell page: useless without its XHR, skip unless it has PDFs
-            kind = "legacy"
         return {
             "status": "ok",
-            "kind": kind,
+            "kind": "legacy",
             "region": event["region"],
             "year": year,
             "html": html,
-            "meta": {"source": "wayback", "url": url, "kind": kind, "title": f"wayback {ts}"},
+            "meta": {"source": "wayback", "url": url, "kind": "legacy",
+                     "title": f"wayback {ts}", "trace": trace},
         }
+    say("no usable wayback capture")
     return {"status": "failed", "region": event["region"], "year": year,
-            "meta": {"source": "wayback"}}
+            "meta": {"source": "wayback", "trace": trace}}
 
 
 def wayback_inventory() -> str | None:

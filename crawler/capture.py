@@ -23,18 +23,24 @@ def _is_challenge(title: str) -> bool:
     return any(m in t for m in CHALLENGE_MARKERS)
 
 
-def clear_challenge(page, url: str, tries: int = 4, settle: int = 8) -> bool:
+def clear_challenge(page, url: str, tries: int = 4, settle: int = 8, log=None) -> bool:
     """goto + retry until the page is not a Cloudflare interstitial. Fast-fails on HTTP >= 400."""
     for i in range(tries):
         try:
             resp = page.goto(url, timeout=60000, wait_until="domcontentloaded")
         except Exception:
             resp = None
+        status = resp.status if resp is not None else "?"
         if resp is not None and resp.status >= 400 and resp.status not in (403, 429, 503):
+            if log:
+                log(f"try {i}: HTTP {status}, not retryable")
             return False  # 404 and friends: no point retrying
         time.sleep(settle)
-        if not _is_challenge(page.title()):
+        title = page.title()
+        if not _is_challenge(title):
             return True
+        if log:
+            log(f"try {i}: HTTP {status}, challenge title={title!r}")
         time.sleep(12)
     return False
 
@@ -60,27 +66,41 @@ def crawl_event(pw, event: dict, attempts: int = 3) -> dict:
     """Try each candidate URL in fresh browsers until valid data or failure.
 
     Returns {'status': 'ok'|'failed', 'kind': 'json'|'legacy', ...raw payload}.
+    Verbose per-attempt output goes to stdout and into meta.trace for the report.
     """
+    key = f"{event.get('region')}-{event.get('year')}"
+    trace: list[str] = []
+
+    def say(line: str):
+        print(f"    {line}")
+        trace.append(line)
+
     for attempt in range(1, attempts + 1):
         browser = None
+        say(f"attempt {attempt}: fresh browser")
         try:
             browser, _ctx, page = _new_page(pw)
             for url in event["urls"]:
                 kind = event["kinds"].get(url, "legacy")
-                if not clear_challenge(page, url):
+                say(f"goto ({kind}) {url}")
+                ok = clear_challenge(page, url, log=say)
+                if not ok:
+                    say(f"challenge/clear failed, title={page.title()!r}")
                     continue
+                say(f"cleared, title={page.title()!r}")
                 if kind == "json":
-                    result = _capture_json(page, url, event["year"])
+                    result = _capture_json(page, url, event["year"], log=say)
                 else:
-                    result = _capture_legacy(page, url)
+                    result = _capture_legacy(page, url, log=say)
                 if result:
                     result.setdefault("meta", {})
                     result["meta"].update(
-                        {"attempt": attempt, "url": url, "kind": kind, "title": page.title()}
+                        {"attempt": attempt, "url": url, "kind": kind,
+                         "title": page.title(), "trace": trace}
                     )
                     return result
         except Exception as e:
-            print(f"[{event.get('region')}-{event.get('year')}] attempt {attempt} error: {e!r}")
+            say(f"attempt {attempt} error: {e!r}")
         finally:
             if browser:
                 try:
@@ -88,10 +108,12 @@ def crawl_event(pw, event: dict, attempts: int = 3) -> dict:
                 except Exception:
                     pass
         time.sleep(20 * attempt)
-    return {"status": "failed", "region": event["region"], "year": event["year"]}
+    say("all attempts exhausted")
+    return {"status": "failed", "region": event["region"], "year": event["year"],
+            "meta": {"source": "live", "trace": trace}}
 
 
-def _capture_json(page, url: str, expected_year: int) -> dict | None:
+def _capture_json(page, url: str, expected_year: int, log=None) -> dict | None:
     captured: list = []
 
     def on_response(resp):
@@ -106,8 +128,12 @@ def _capture_json(page, url: str, expected_year: int) -> dict | None:
         time.sleep(12)  # page's own JS fetches sessions.json and renders
         rendered = page.locator("ul#cal_content_Day li").count()
         title = page.title()
+        if log:
+            log(f"rendered_li={rendered}, xhr_captured={len(captured)}, title={title!r}")
         for resp in captured:
             try:
+                if log:
+                    log(f"xhr {resp.status} {resp.url[-70:]}")
                 if resp.status != 200:
                     continue
                 data = json.loads(resp.body())
@@ -116,6 +142,8 @@ def _capture_json(page, url: str, expected_year: int) -> dict | None:
             # year validation: guard against microsite redirects to the
             # current-year event (e.g. /eu-24/ -> Europe 2026)
             year_ok = f"/{expected_year}/" in resp.url or str(expected_year) in title
+            if not year_ok and log:
+                log(f"year validation failed (want {expected_year})")
             if year_ok and data:
                 return {
                     "status": "ok",
@@ -134,8 +162,11 @@ def _capture_json(page, url: str, expected_year: int) -> dict | None:
     return None
 
 
-def _capture_legacy(page, url: str) -> dict | None:
+def _capture_legacy(page, url: str, log=None) -> dict | None:
     html = page.content()
+    n_pdfs = html.lower().count(".pdf")
+    if log:
+        log(f"legacy page {len(html)}B, pdf refs {n_pdfs}")
     if ".pdf" not in html.lower():
         return None
     return {"status": "ok", "kind": "legacy", "html": html, "source_url": url}
