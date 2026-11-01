@@ -1,15 +1,16 @@
 name: Egress Probe
 
-# Phase 0, iteration 2: can a rendered schedule page's OWN XHR fetch sessions.json?
-# Strategy under test: browser opens schedule page -> capture JSON responses via
-# response listener -> if captured, the crawler is "render-and-capture", no direct
-# JSON navigation needed. Also tests cf_clearance cookie carry-over to other paths.
+# Phase 0, iteration 3 — the decisive test.
+# Hypothesis: pass Cloudflare's managed challenge ONCE on a schedule page, then
+# pull ALL data via same-origin fetch() from inside the cleared page context
+# (Chromium TLS stack + cf_clearance + polite pacing). If this works, the live
+# crawler architecture is: 1 page load + N in-page fetches.
 
 on:
   workflow_dispatch:
 
 jobs:
-  capture-probe:
+  inpage-fetch-probe:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-python@v5
@@ -21,101 +22,115 @@ jobs:
           pip install playwright
           playwright install chromium --with-deps
 
-      - name: Render-and-capture probe
+      - name: Cleared-context in-page fetch probe
         run: |
           python - <<'PY'
           import json, time
           from playwright.sync_api import sync_playwright
 
           UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+          BASE = "https://www.blackhat.com"
 
-          SCHEDULES = [
-              "https://www.blackhat.com/us-24/briefings/schedule/index.html",
-              "https://www.blackhat.com/archive/usa/2025/briefings/schedule/index.html",
-              "https://www.blackhat.com/archive/asia/2024/briefings/schedule/index.html",
-          ]
+          FETCH_JS = """async (u) => {
+              const r = await fetch(u, {credentials: 'include'});
+              const t = await r.text();
+              return {status: r.status, len: t.length, head: t.slice(0, 120)};
+          }"""
 
-          def try_page(page, url):
-              print("=" * 60)
-              print("PAGE:", url)
-              captured = []
-              def on_response(resp):
+          def clear_until_ready(page, url, max_tries=4):
+              for i in range(max_tries):
                   try:
-                      ct = (resp.headers or {}).get("content-type", "")
-                      if "sessions" in resp.url or "json" in ct:
-                          captured.append(resp)
-                  except Exception:
-                      pass
-              page.on("response", on_response)
+                      page.goto(url, timeout=60000, wait_until="domcontentloaded")
+                  except Exception as e:
+                      print("  goto error:", repr(e)[:150])
+                  time.sleep(8)
+                  t = page.title()
+                  print(f"  try {i}: title={t[:60]!r}")
+                  low = t.lower()
+                  if "moment" not in low and "attention" not in low:
+                      return True
+                  time.sleep(12)
+              return False
+
+          def page_fetch(page, label, url, pause=15):
+              print("-" * 60)
+              print(f"FETCH [{label}]: {url}")
               try:
-                  resp = page.goto(url, timeout=60000, wait_until="domcontentloaded")
-                  print("NAV_STATUS:", resp.status if resp else None)
-                  time.sleep(10)  # let the page's own JS fetch sessions.json + render
-                  title = page.title()
-                  print("TITLE:", title[:80])
-                  if "moment" in title.lower() or "attention" in title.lower():
-                      print("CHALLENGE_PAGE: yes; waiting 5s and reloading once")
-                      time.sleep(5)
-                      page.reload(timeout=60000, wait_until="domcontentloaded")
-                      time.sleep(10)
-                      print("TITLE_AFTER_RELOAD:", page.title()[:80])
-                  li = page.locator("ul#cal_content_Day li").count()
-                  print("RENDERED_SESSION_LI:", li)
-                  print("JSON_RESPONSES_CAPTURED:", len(captured))
-                  for r in captured:
-                      try:
-                          body = r.body()
-                          print("  JSON_URL:", r.url[-70:])
-                          print("  JSON_STATUS:", r.status, "bytes:", len(body))
-                          try:
-                              data = json.loads(body)
-                              n = len(data) if isinstance(data, list) else -1
-                              print("  JSON_PARSES: yes, items:", n)
-                          except Exception as e:
-                              print("  JSON_PARSES: no -", str(e)[:80])
-                      except Exception as e:
-                          print("  JSON body read error:", repr(e)[:120])
+                  res = page.evaluate(FETCH_JS, url)
+                  print(f"  STATUS {res['status']} | len {res['len']}")
+                  print(f"  HEAD {res['head'][:110]!r}")
+                  return res
               except Exception as e:
-                  print("ERROR:", repr(e)[:300])
+                  print("  EVALUATE ERROR:", repr(e)[:200])
+                  return {"status": -1, "len": 0, "head": ""}
               finally:
-                  try:
-                      page.remove_listener("response", on_response)
-                  except Exception:
-                      pass
+                  time.sleep(pause)
 
           with sync_playwright() as p:
               browser = p.chromium.launch(args=["--no-sandbox"])
               ctx = browser.new_context(user_agent=UA)
               page = ctx.new_page()
 
-              for u in SCHEDULES:
-                  try_page(page, u)
+              print("=" * 60)
+              print("STEP 1: clear challenge on us-24 schedule page")
+              ok = clear_until_ready(page, BASE + "/us-24/briefings/schedule/index.html")
+              print("CLEARED:", ok)
+              if not ok:
+                  print("FATAL: could not clear challenge; aborting fetch tests")
+                  browser.close()
+                  raise SystemExit(0)
+
+              print("waiting 20s before in-page fetches...")
+              time.sleep(20)
 
               print("=" * 60)
-              print("COOKIES_NOW:", sorted(c["name"] for c in ctx.cookies()))
+              print("STEP 2: in-page same-origin fetches (paced 15s)")
+
+              targets = [
+                  ("sessions us-24 microsite", "/us-24/briefings/schedule/sessions.json"),
+                  ("sessions usa/2025 newpath", "/archive/usa/2025/briefings/schedule/sessions.json"),
+                  ("sessions asia/2024 newpath", "/archive/asia/2024/briefings/schedule/sessions.json"),
+                  ("sessions europe/2023 newpath", "/archive/europe/2023/briefings/schedule/sessions.json"),
+                  ("legacy static us-16", "/us-16/briefings.html"),
+                  ("archives inventory", "/html/archives.html"),
+              ]
+              results = {}
+              for label, path in targets:
+                  results[label] = page_fetch(page, label, BASE + path)
 
               print("=" * 60)
-              print("DIRECT_JSON_WITH_CONTEXT_COOKIES:")
+              print("STEP 3: JSON item counts for fetched sessions.json")
+              for label in [t[0] for t in targets if "sessions" in t[1]]:
+                  r = results.get(label, {})
+                  if r.get("status") == 200 and r.get("len", 0) > 1000:
+                      try:
+                          res2 = page.evaluate(
+                              "async (u) => { const r = await fetch(u, {credentials:'include'}); const t = await r.text(); return t; }",
+                              BASE + [t[1] for t in targets if t[0] == label][0],
+                          )
+                          data = json.loads(res2)
+                          n = len(data) if isinstance(data, list) else len(data.get("sessions", data))
+                          sample = ""
+                          if isinstance(data, list) and data:
+                              sample = str(data[0])[:150]
+                          print(f"  {label}: JSON_OK items={n} sample={sample!r}")
+                      except Exception as e:
+                          print(f"  {label}: re-fetch/parse error {repr(e)[:150]}")
+                      time.sleep(10)
+
+              print("=" * 60)
+              print("STEP 4: paced second navigation (asia/2024 page, 30s wait)")
+              time.sleep(30)
               try:
-                  r = ctx.request.get("https://www.blackhat.com/us-24/briefings/schedule/sessions.json", timeout=30000)
-                  b = r.body()
-                  print("  STATUS:", r.status, "bytes:", len(b))
-                  try:
-                      data = json.loads(b)
-                      print("  JSON_PARSES: yes, items:", len(data) if isinstance(data, list) else -1)
-                  except Exception:
-                      print("  JSON_PARSES: no (likely CF block page)")
+                  resp = page.goto(BASE + "/archive/asia/2024/briefings/schedule/index.html",
+                                   timeout=60000, wait_until="domcontentloaded")
+                  time.sleep(8)
+                  print("  NAV2_STATUS:", resp.status if resp else None,
+                        "TITLE:", page.title()[:60])
+                  li = page.locator("ul#cal_content_Day li").count()
+                  print("  NAV2_RENDERED_LI:", li)
               except Exception as e:
-                  print("  ERROR:", repr(e)[:200])
-
-              print("=" * 60)
-              print("ARCHIVES_HTML_AFTER_COOKIES:")
-              try:
-                  resp = page.goto("https://www.blackhat.com/html/archives.html", timeout=60000, wait_until="domcontentloaded")
-                  time.sleep(3)
-                  print("  STATUS:", resp.status if resp else None, "TITLE:", page.title()[:60])
-              except Exception as e:
-                  print("  ERROR:", repr(e)[:200])
+                  print("  NAV2 ERROR:", repr(e)[:200])
 
               browser.close()
           PY
