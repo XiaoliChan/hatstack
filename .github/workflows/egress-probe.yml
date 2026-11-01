@@ -1,66 +1,15 @@
 name: Egress Probe
 
-# Phase 0: test whether GitHub Actions egress can reach live blackhat.com.
-# Two parallel jobs:
-#   curl-probe    - plain HTTP client (detects IP-level WAF blocks)
-#   browser-probe - headless Chromium via Playwright (detects TLS/JA3-only blocks)
-# Manual trigger only.
+# Phase 0, iteration 2: can a rendered schedule page's OWN XHR fetch sessions.json?
+# Strategy under test: browser opens schedule page -> capture JSON responses via
+# response listener -> if captured, the crawler is "render-and-capture", no direct
+# JSON navigation needed. Also tests cf_clearance cookie carry-over to other paths.
 
 on:
   workflow_dispatch:
 
 jobs:
-  curl-probe:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Runner egress info
-        run: |
-          echo "Egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo unknown)"
-
-      - name: Probe blackhat.com endpoints with curl
-        run: |
-          set +e
-          UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
-
-          probe() {
-            label="$1"; url="$2"; save="$3"
-            echo "=================================================="
-            echo "### $label"
-            echo "GET $url"
-            curl -sS -L --compressed -A "$UA" --max-time 30 \
-              -o "/tmp/${save}" \
-              -w "RESULT: HTTP %{http_code} | type=%{content_type} | bytes=%{size_download} | time=%{time_total}s | final=%{url_effective}\n" \
-              "$url"
-            echo "--- body first 300 bytes ---"
-            head -c 300 "/tmp/${save}" | tr -d '\0'
-            echo; echo
-          }
-
-          probe "Archives inventory HTML"          "https://www.blackhat.com/html/archives.html"                                      archives.html
-          probe "Schedule shell HTML (us-24)"      "https://www.blackhat.com/us-24/briefings/schedule/index.html"                     sched.html
-          probe "sessions.json (us-24 microsite)"  "https://www.blackhat.com/us-24/briefings/schedule/sessions.json"                  s1.json
-          probe "sessions.json (usa/2025 newpath)" "https://www.blackhat.com/archive/usa/2025/briefings/schedule/sessions.json"       s2.json
-          probe "sessions.json (asia/2024 newpath)" "https://www.blackhat.com/archive/asia/2024/briefings/schedule/sessions.json"      s3.json
-          probe "Legacy static (us-16)"            "https://www.blackhat.com/us-16/briefings.html"                                    legacy.html
-
-          echo "=================================================="
-          echo "### Schedule shell structure checks"
-          echo -n "cal_content_Day present: "; grep -c 'cal_content_Day' /tmp/sched.html || true
-          echo -n "dataUrl sessions.json present: "; grep -o "dataUrl = '[^']*'" /tmp/sched.html || echo "NOT FOUND"
-
-          echo "=================================================="
-          echo "### sessions.json validity checks"
-          for f in s1 s2 s3; do
-            echo -n "$f.json JSON parses: "
-            python3 -c "import json;d=json.load(open('/tmp/$f.json'));print('YES,', len(d) if isinstance(d,list) else list(d.keys())[:5])" 2>&1 | head -1
-          done
-
-          echo "=================================================="
-          echo "### PDF CDN HEAD (i.blackhat.com)"
-          curl -sSI -A "$UA" --max-time 30 "https://i.blackhat.com/USA-22/Wednesday/us-22-Kettle-Browser-Powered-Desync-Attacks.pdf" | head -12
-          exit 0
-
-  browser-probe:
+  capture-probe:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-python@v5
@@ -72,38 +21,101 @@ jobs:
           pip install playwright
           playwright install chromium --with-deps
 
-      - name: Probe with headless Chromium
+      - name: Render-and-capture probe
         run: |
           python - <<'PY'
+          import json, time
           from playwright.sync_api import sync_playwright
 
-          urls = [
-              "https://www.blackhat.com/html/archives.html",
+          UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+
+          SCHEDULES = [
               "https://www.blackhat.com/us-24/briefings/schedule/index.html",
-              "https://www.blackhat.com/us-24/briefings/schedule/sessions.json",
-              "https://www.blackhat.com/archive/usa/2025/briefings/schedule/sessions.json",
+              "https://www.blackhat.com/archive/usa/2025/briefings/schedule/index.html",
+              "https://www.blackhat.com/archive/asia/2024/briefings/schedule/index.html",
           ]
+
+          def try_page(page, url):
+              print("=" * 60)
+              print("PAGE:", url)
+              captured = []
+              def on_response(resp):
+                  try:
+                      ct = (resp.headers or {}).get("content-type", "")
+                      if "sessions" in resp.url or "json" in ct:
+                          captured.append(resp)
+                  except Exception:
+                      pass
+              page.on("response", on_response)
+              try:
+                  resp = page.goto(url, timeout=60000, wait_until="domcontentloaded")
+                  print("NAV_STATUS:", resp.status if resp else None)
+                  time.sleep(10)  # let the page's own JS fetch sessions.json + render
+                  title = page.title()
+                  print("TITLE:", title[:80])
+                  if "moment" in title.lower() or "attention" in title.lower():
+                      print("CHALLENGE_PAGE: yes; waiting 5s and reloading once")
+                      time.sleep(5)
+                      page.reload(timeout=60000, wait_until="domcontentloaded")
+                      time.sleep(10)
+                      print("TITLE_AFTER_RELOAD:", page.title()[:80])
+                  li = page.locator("ul#cal_content_Day li").count()
+                  print("RENDERED_SESSION_LI:", li)
+                  print("JSON_RESPONSES_CAPTURED:", len(captured))
+                  for r in captured:
+                      try:
+                          body = r.body()
+                          print("  JSON_URL:", r.url[-70:])
+                          print("  JSON_STATUS:", r.status, "bytes:", len(body))
+                          try:
+                              data = json.loads(body)
+                              n = len(data) if isinstance(data, list) else -1
+                              print("  JSON_PARSES: yes, items:", n)
+                          except Exception as e:
+                              print("  JSON_PARSES: no -", str(e)[:80])
+                      except Exception as e:
+                          print("  JSON body read error:", repr(e)[:120])
+              except Exception as e:
+                  print("ERROR:", repr(e)[:300])
+              finally:
+                  try:
+                      page.remove_listener("response", on_response)
+                  except Exception:
+                      pass
 
           with sync_playwright() as p:
               browser = p.chromium.launch(args=["--no-sandbox"])
-              ctx = browser.new_context(
-                  user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
-              )
+              ctx = browser.new_context(user_agent=UA)
               page = ctx.new_page()
-              for u in urls:
-                  print("=" * 50)
-                  print("URL:", u)
+
+              for u in SCHEDULES:
+                  try_page(page, u)
+
+              print("=" * 60)
+              print("COOKIES_NOW:", sorted(c["name"] for c in ctx.cookies()))
+
+              print("=" * 60)
+              print("DIRECT_JSON_WITH_CONTEXT_COOKIES:")
+              try:
+                  r = ctx.request.get("https://www.blackhat.com/us-24/briefings/schedule/sessions.json", timeout=30000)
+                  b = r.body()
+                  print("  STATUS:", r.status, "bytes:", len(b))
                   try:
-                      resp = page.goto(u, timeout=45000, wait_until="domcontentloaded")
-                      body = page.content()
-                      print("STATUS:", resp.status if resp else "None")
-                      print("CONTENT-TYPE:", (resp.headers.get("content-type") if resp else "?"))
-                      print("BODY_LEN:", len(body))
-                      print("FIRST_200:", body[:200].replace("\n", " "))
-                      if "schedule/index.html" in u:
-                          sess = page.locator("ul#cal_content_Day li").count()
-                          print("RENDERED_SESSION_LI:", sess)
-                  except Exception as e:
-                      print("ERROR:", repr(e)[:400])
+                      data = json.loads(b)
+                      print("  JSON_PARSES: yes, items:", len(data) if isinstance(data, list) else -1)
+                  except Exception:
+                      print("  JSON_PARSES: no (likely CF block page)")
+              except Exception as e:
+                  print("  ERROR:", repr(e)[:200])
+
+              print("=" * 60)
+              print("ARCHIVES_HTML_AFTER_COOKIES:")
+              try:
+                  resp = page.goto("https://www.blackhat.com/html/archives.html", timeout=60000, wait_until="domcontentloaded")
+                  time.sleep(3)
+                  print("  STATUS:", resp.status if resp else None, "TITLE:", page.title()[:60])
+              except Exception as e:
+                  print("  ERROR:", repr(e)[:200])
+
               browser.close()
           PY
