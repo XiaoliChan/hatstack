@@ -4,7 +4,7 @@ A searchable index of Black Hat briefings — every talk from **US, EU and Asia,
 1997 to today**: title, speakers, abstract, and official slide / whitepaper /
 tool links, searchable in the browser.
 
-**Live site:** <https://xiaolichan.github.io/BlackHat-Scrapy/>
+**Live site:** <https://xiaolichan.github.io/hatstack/>
 
 ## How it works
 
@@ -37,6 +37,14 @@ dataset/dataset.json ──(Vite + React + shadcn/ui + MiniSearch)──▶ GitH
   ```
   Note: blackhat.com is behind Cloudflare; the crawler works from GitHub
   Actions runners and most residential IPs.
+
+## PDF downloads
+
+Bulk PDF archives are built on demand — grab them from the
+[*Download PDFs* workflow](https://github.com/XiaoliChan/hatstack/actions/workflows/download-pdfs.yml):
+run it with an event label (e.g. `US-24`), then download the `BlackHat-PDF-<event>`
+artifact from the run page. It ships every talk's slides (and whitepapers, tools
+if you pick those options) as one tarball — same as this repo always did.
 
 ## Repository layout
 
