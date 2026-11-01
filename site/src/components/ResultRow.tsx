@@ -53,7 +53,7 @@ export function ResultRow({ s, terms }: { s: Session; terms: Set<string> }) {
           )}
         </h3>
         <span className="shrink-0 rounded-md border border-line px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
-          {s.event.label}
+          {badge}
         </span>
       </div>
       {speakerLine && (
