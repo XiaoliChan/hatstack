@@ -1,5 +1,7 @@
 crawler/cache/
 site/node_modules/
 site/dist/
-dataset/*.local.json
 save/
+__pycache__/
+*.pyc
+.pytest_cache/
