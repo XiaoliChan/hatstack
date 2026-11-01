@@ -26,11 +26,12 @@ _SERIES_RES = [
         r"^\d{1,2}c3$",          # 16C3 … 39C3
         r"^(cc)?camp\d*$",       # camp2019 / cccamp23
         r"^gpn\d+$",             # GPN
-        r"^eh\d+$",              # Easterhegg
+        r"^eh\d+$",               # Easterhegg
         r"^mrmcd[\da-z]+$",      # MRMCD
         r"^(ds\d{4}|datenspuren)$",
         r"^fiffkon\d+$",
         r"^divoc",
+        r"^froscon\d+$",         # FrOSCon (security-relevant talks, ~20 editions)
     )
 ]
 
