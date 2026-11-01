@@ -1,0 +1,5 @@
+crawler/cache/
+site/node_modules/
+site/dist/
+dataset/*.local.json
+save/
