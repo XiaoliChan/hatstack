@@ -143,7 +143,7 @@ def wayback_event(event: dict) -> dict:
         if not body:
             say(f"no capture: {url}")
             continue
-        say(f"got {len(body)}B: {url}")
+        say(f"got {len(body)}B via web.archive.org: {url}")
         try:
             data = json.loads(body)
         except Exception as e:
@@ -173,7 +173,7 @@ def wayback_event(event: dict) -> dict:
             say(f"no capture: {url}")
             continue
         html = body.decode("utf-8", "replace")
-        say(f"got {len(html)}B page: {url} (pdfs: {html.lower().count('.pdf')})")
+        say(f"got {len(html)}B page via web.archive.org: {url} (pdfs: {html.lower().count('.pdf')})")
         if ".pdf" not in html.lower():
             continue
         return {

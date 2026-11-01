@@ -80,7 +80,7 @@ def collect(ctx: dict) -> dict[str, dict]:
                 print(f"    ok: {cap['kind']} ({len(ds_mod.build_records(key, cap))} records, "
                       f"{cap.get('meta', {}).get('title')})")
             else:
-                print("    FAILED (no usable wayback capture)")
+                print("    no wayback capture -> live fallback")
         except Exception as e:
             import traceback
 
@@ -89,6 +89,11 @@ def collect(ctx: dict) -> dict[str, dict]:
             captures[key] = {"status": "failed",
                              "meta": {"trace": [f"exception: {e!r}"]}}
 
+    # wayback-missing events fall back to the live fresh-browser channel
+    # (monthly cadence keeps this far below Cloudflare's trouble threshold)
+    wb_missing = [k for k, e in wb_todo if captures.get(k, {}).get("status") != "ok"]
+
+    live_todo = live_todo + [(k, e) for k, e in wb_todo if k in set(wb_missing)]
     if live_todo:
         from playwright.sync_api import sync_playwright
 

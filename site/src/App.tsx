@@ -109,11 +109,6 @@ export default function App() {
 
   const terms = useMemo(() => new Set(queryTerms(debounced)), [debounced])
 
-  const filtersActive = filters.edition !== null
-  const showResults = debounced !== "" || filtersActive
-
-  const SUGGESTIONS = ["kerberos", "active directory", "windows kernel", "dns", "zero-day", "supply chain"]
-
   const totalPages = Math.max(1, Math.ceil(results.length / PAGE))
   const pageRows = results.slice((page - 1) * PAGE, page * PAGE)
   const pageNumbers = useMemo(() => {
@@ -181,28 +176,6 @@ export default function App() {
           )}
 
           <main aria-live="polite">
-            {meta && !showResults && (
-              <div className="py-14 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Type to search {meta.total.toLocaleString()} talks — or pick a starting point:
-                </p>
-                <div className="mt-4 flex flex-wrap justify-center gap-2">
-                  {SUGGESTIONS.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setQuery(s)}
-                      className="rounded-full border border-line px-3.5 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-6 text-xs text-muted-foreground/70">
-                  Or filter by conference, region and year on the left to browse a single event.
-                </p>
-              </div>
-            )}
             {loadError && (
               <p className="py-10 text-sm text-muted-foreground">
                 Couldn't load the dataset. Refresh the page, or check the{" "}
@@ -217,7 +190,7 @@ export default function App() {
                 .
               </p>
             )}
-            {dataset && showResults && results.length === 0 && (
+            {dataset && results.length === 0 && (
               <div className="py-10 text-sm text-muted-foreground">
                 <p>No talks match {debounced ? `“${debounced}”` : "these filters"}.</p>
                 <button
@@ -232,10 +205,10 @@ export default function App() {
                 </button>
               </div>
             )}
-            {showResults && pageRows.map((s) => (
+            {pageRows.map((s) => (
               <ResultRow key={s.id} s={s} terms={terms} />
             ))}
-            {showResults && totalPages > 1 && (
+            {totalPages > 1 && (
               <nav className="flex items-center justify-center gap-2 py-8" aria-label="Pagination">
                 <button
                   type="button"
