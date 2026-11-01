@@ -88,8 +88,9 @@ def test_report_handles_hyphenless_cache_keys():
     per_conf = {"ccc": {"38c3": _capture(_records("ccc", "eu", 2024))}}
     ds = build_dataset(per_conf)
     md, report = build_report(per_conf, ds)
-    assert "ccc/38c3" in md
-    assert report["events"]["ccc/38c3"]["sessions"] == 2
+    assert "| 38c3 | ok | records | 2 |" in md
+    ccc = next(c for c in report["conferences"] if c["id"] == "ccc")
+    assert next(e for e in ccc["events"] if e["key"] == "38c3")["sessions"] == 2
 
 
 def test_clean_title_strips_media_server_marker():

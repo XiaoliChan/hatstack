@@ -82,7 +82,12 @@ export default function App() {
               year > 0 ? [regionTag, year].filter(Boolean).join("-") : [regionTag, "unknown"].filter(Boolean).join("-")
             return { key, label, count: v.count }
           })
-          .sort((a, b) => a.label.localeCompare(b.label))
+          .sort((a, b) => {
+            const ya = Number(a.key.split("|")[2])
+            const yb = Number(b.key.split("|")[2])
+            if (ya !== yb) return (yb > 0 ? yb : -1) - (ya > 0 ? ya : -1) // newest first, unknown last
+            return a.label.localeCompare(b.label)
+          })
         return { conf: c, editions, count: totals.get(c.id) ?? 0 }
       })
   }, [dataset])

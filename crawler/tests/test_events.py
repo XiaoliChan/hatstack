@@ -128,6 +128,10 @@ def test_dataset_and_report():
     assert ds["sessions"][0]["event"]["year"] == 2024
 
     md, rep = build_report({"blackhat": caps}, ds)
-    assert "| blackhat/us-2024 | ok | json |" in md
-    assert "| blackhat/eu-2020 | failed |" in md
-    assert rep["events"]["blackhat/us-2016"]["sessions"] > 80
+    assert "## blackhat" in md
+    assert "| us-2024 | ok | json |" in md
+    assert "| eu-2020 | failed |" in md
+    bh = next(c for c in rep["conferences"] if c["id"] == "blackhat")
+    us16 = next(e for e in bh["events"] if e["key"] == "us-2016")
+    assert us16["sessions"] > 80
+    assert "blackhat/eu-2020" in rep["failed"]

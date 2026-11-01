@@ -67,8 +67,8 @@ def build_dataset(per_conf: dict[str, dict[str, dict]], prior_sessions: list[dic
         {r["conference"] for r in unique}
         | {c for c, caps in per_conf.items() if any(v.get("status") == "ok" for v in caps.values())}
     )
-    # manifest (id/name/url) comes from the adapters themselves — the site
-    # reads it from the dataset instead of hardcoding anything
+    # manifest (id/name/url/description) comes from the adapters themselves —
+    # the site reads it from the dataset instead of hardcoding anything
     from importlib import import_module
 
     conferences = []
@@ -83,9 +83,39 @@ def build_dataset(per_conf: dict[str, dict[str, dict]], prior_sessions: list[dic
             })
         except Exception:
             conferences.append({"id": cid, "name": cid, "url": None, "description": None})
+
+    # editions index mirroring the site sidebar: conference -> edition -> ids
+    # (sessions stay flat for search; this is the normalized view)
+    editions: dict[str, dict] = {}
+    for r in unique:
+        conf = r["conference"]
+        region, year = r["event"]["region"], r["event"]["year"]
+        key = f"{conf}|{region}|{year}"
+        e = editions.setdefault(key, {
+            "key": key, "conference": conf, "region": region, "year": year,
+            "label": "", "count": 0, "session_ids": [],
+        })
+        e["count"] += 1
+        e["session_ids"].append(r["id"])
+    regions_per_conf: dict[str, set] = {}
+    for r in unique:
+        regions_per_conf.setdefault(r["conference"], set()).add(r["event"]["region"])
+    for e in editions.values():
+        multi = len(regions_per_conf[e["conference"]]) > 1
+        tag = e["region"].upper() if multi else None
+        e["label"] = "-".join(str(x) for x in ([tag, e["year"]] if e["year"] > 0 else [tag, "unknown"]) if x)
+    edition_list = sorted(
+        editions.values(),
+        key=lambda e: (
+            conference_ids.index(e["conference"]),
+            -(e["year"] if e["year"] > 0 else -1),  # newest first, unknown last
+            e["region"],
+        ),
+    )
     return {
         "version": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "conferences": conferences,
+        "editions": edition_list,
         "sessions": unique,
     }
 
@@ -100,19 +130,19 @@ def build_report(per_conf: dict[str, dict[str, dict]], dataset: dict) -> tuple[s
         f"- sessions with whitepaper: {sum(1 for s in dataset['sessions'] if s['files']['whitepaper'])}",
         f"- sessions with tool: {sum(1 for s in dataset['sessions'] if s['files']['tool'])}",
         f"- sessions with abstract: {sum(1 for s in dataset['sessions'] if s['abstract'])}",
-        "",
-        "| event | status | kind | sessions | note |",
-        "|---|---|---|---|---|",
     ]
+
     def _year_sort_key(key: str) -> tuple[int, str]:
         parts = key.split("-")
         year = -int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
         return (year, key)
 
-    report_events = {}
+    conferences_report = []
+    failed = []
     for conf_id, captures in per_conf.items():
+        events = []
+        md_rows = []
         for key in sorted(captures, key=_year_sort_key):
-            row_key = f"{conf_id}/{key}"
             cap = captures[key]
             meta = cap.get("meta", {})
             trace = meta.get("trace") or []
@@ -122,17 +152,34 @@ def build_report(per_conf: dict[str, dict[str, dict]], dataset: dict) -> tuple[s
             # "38c3") doesn't match the dataset's region-year row keys, so
             # tallying from dataset sessions always showed 0
             n = len(build_records(key, cap, conference=conf_id))
-            lines.append(
-                f"| {row_key} | {cap.get('status','?')} | {cap.get('kind','-')} | {n} | {note} |"
-            )
-            report_events[row_key] = {
-                "status": cap.get("status"),
+            status = cap.get("status", "?")
+            events.append({
+                "key": key,
+                "status": status,
                 "kind": cap.get("kind"),
                 "sessions": n,
                 "url": meta.get("url"),
                 "title": meta.get("title"),
-            }
-    return "\n".join(lines) + "\n", {"events": report_events, "total": len(dataset["sessions"])}
+                "note": note or None,
+            })
+            if status != "ok":
+                failed.append(f"{conf_id}/{key}")
+            md_rows.append(f"| {key} | {status} | {cap.get('kind','-')} | {n} | {note} |")
+        lines.append("")
+        lines.append(f"## {conf_id}")
+        lines.append("")
+        lines.append("| event | status | kind | sessions | note |")
+        lines.append("|---|---|---|---|---|")
+        lines.extend(md_rows)
+        conferences_report.append({"id": conf_id, "events": events})
+    lines.append("")
+    lines.append(f"failed events: {', '.join(failed) if failed else 'none'}")
+    return "\n".join(lines) + "\n", {
+        "version": dataset["version"],
+        "total": len(dataset["sessions"]),
+        "conferences": conferences_report,
+        "failed": failed,
+    }
 
 
 def write_outputs(dataset: dict, per_conf: dict[str, dict[str, dict]], out_dir: Path) -> dict[str, Path]:
