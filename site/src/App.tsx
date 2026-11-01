@@ -100,9 +100,17 @@ export default function App() {
   return (
     <div className="min-h-dvh bg-background text-foreground">
       <div className="mx-auto max-w-3xl px-5 md:px-8">
-        <header className="flex items-baseline justify-between gap-4 pt-8 pb-2">
+        <header className="flex items-center justify-between gap-4 pt-8 pb-2">
           <h1 className="text-[15px] font-bold tracking-tight">Black Hat Briefings</h1>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <a
+              href="https://xiaolichan.github.io/"
+              className="inline-flex items-center h-8 px-3 rounded-md border border-line text-[13px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+            >
+              XiaoliChan
+            </a>
+            <ThemeToggle />
+          </div>
         </header>
         <p className="text-[13px] text-muted-foreground pb-6">
           {meta ? (
