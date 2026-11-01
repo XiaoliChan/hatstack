@@ -7,6 +7,7 @@ then /web/<ts>id_/ returns the ORIGINAL bytes (no wayback wrapper).
 from __future__ import annotations
 
 import gzip
+import re
 import json
 import random
 import time
@@ -174,20 +175,76 @@ def wayback_event(event: dict) -> dict:
             continue
         html = body.decode("utf-8", "replace")
         say(f"got {len(html)}B page via web.archive.org: {url} (pdfs: {html.lower().count('.pdf')})")
-        if ".pdf" not in html.lower():
-            continue
-        return {
-            "status": "ok",
-            "kind": "legacy",
-            "region": event["region"],
-            "year": year,
-            "html": html,
-            "meta": {"source": "wayback", "url": url, "kind": "legacy",
-                     "title": f"wayback {ts}", "trace": trace},
-        }
+        if ".pdf" in html.lower():
+            return {
+                "status": "ok",
+                "kind": "legacy",
+                "region": event["region"],
+                "year": year,
+                "html": html,
+                "meta": {"source": "wayback", "url": url, "kind": "legacy",
+                         "title": f"wayback {ts}", "trace": trace},
+            }
+        # 2013-2014 era: listing pages link per-talk detail pages instead of
+        # direct PDFs ("us-15-Gaddam-Securing-Your-Big-Data.html"). Derive
+        # speaker+title from the slug — zero extra requests.
+        detail = _records_from_detail_links(html, event["region"], year)
+        if detail:
+            say(f"{len(detail)} talks from detail-page links")
+            return {
+                "status": "ok",
+                "kind": "records",
+                "region": event["region"],
+                "year": year,
+                "records": detail,
+                "meta": {"source": "wayback", "url": url, "kind": "records",
+                         "title": f"wayback {ts}", "trace": trace},
+            }
     say("no usable wayback capture")
     return {"status": "failed", "region": event["region"], "year": year,
             "meta": {"source": "wayback", "trace": trace}}
+
+
+def _records_from_detail_links(html: str, region: str, year: int) -> list[dict]:
+    """Listing pages of the 2013-2015 era link root-level talk pages whose
+    slugs carry speaker+title: <region>-<yy>-<Author>-<Title>.html"""
+    yy = str(year)[2:]
+    prefix = f"{region}-{yy}-"
+    slugs = re.findall(
+        rf'href="(?:https?://www\.blackhat\.com)?/({re.escape(prefix)}[^"/]+?)\.html"',
+        html,
+    )
+    label = f"{region.upper()}-{yy}" if region != "asia" else f"Asia-{yy}"
+    records = []
+    seen: set[str] = set()
+    for slug in dict.fromkeys(slugs):
+        parts = slug[len(prefix):].split("-")
+        if not parts or not parts[0]:
+            continue
+        speaker = parts[0] if len(parts) > 1 else ""
+        title = " ".join(parts[1:]) if len(parts) > 1 else parts[0]
+        if len(title) < 4:
+            continue
+        key = slug.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        rid = f"{region}{yy}-" + re.sub(r"[^a-z0-9]+", "-", slug.lower()).strip("-")[:60]
+        records.append(
+            {
+                "id": rid,
+                "event": {"region": region, "year": year, "label": label},
+                "title": title,
+                "speakers": ([{"name": speaker, "company": None, "role": None}]
+                             if 2 < len(speaker) < 25 else []),
+                "abstract": "",
+                "track": None,
+                "files": {"slides": None, "whitepaper": None, "tool": None},
+                "video_url": None,
+                "source_url": f"https://web.archive.org/web/2/https://www.blackhat.com/{slug}.html",
+            }
+        )
+    return records
 
 
 def wayback_inventory() -> str | None:
