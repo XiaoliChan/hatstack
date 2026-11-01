@@ -9,7 +9,9 @@ from pathlib import Path
 
 from . import dataset as ds_mod
 from . import events as ev_mod
-from .capture import crawl_event, fetch_inventory, pace
+from .wayback import wayback_event, wayback_inventory
+
+WAYBACK_MAX_YEAR = 2025  # <=2025: wayback only (no Cloudflare); >=2026: live
 
 
 def _prepare_inventory(inventory: dict[str, dict]) -> dict[str, dict]:
@@ -41,48 +43,64 @@ def _save_cache(cache_dir: Path, key: str, capture: dict):
 
 
 def cmd_crawl(args) -> int:
-    from playwright.sync_api import sync_playwright  # lazy: tests don't need it
-
     cache_dir = Path(args.cache_dir)
     captures = _load_cache(cache_dir)
 
-    with sync_playwright() as pw:
-        inventory = {}
-        if not args.use_cache:
-            html = fetch_inventory(pw)
-            if html:
-                inventory = ev_mod.parse_inventory(html)
-                print(f"inventory: {len(inventory)} events from archives.html")
-            else:
-                print("inventory unavailable -> generative fallback map")
-            pace(10, 15)
-        inventory = _prepare_inventory(inventory)
+    inventory = {}
+    if not args.use_cache:
+        html = wayback_inventory()  # plain requests, no browser
+        if html:
+            inventory = ev_mod.parse_inventory(html)
+            print(f"inventory: {len(inventory)} events from archives.html (wayback)")
+        else:
+            print("wayback inventory unavailable -> generative fallback map")
+    inventory = _prepare_inventory(inventory)
 
-        wanted = set(args.events) if args.events else None
-        todo = []
-        for key in sorted(inventory, key=lambda k: (-int(k.split("-")[1]), k)):
-            if wanted and key not in wanted:
-                continue
-            if key in captures and captures[key].get("status") == "ok" and not args.refresh:
-                continue
-            todo.append((key, inventory[key]))
-        if args.limit:
-            todo = todo[: args.limit]
-        print(f"to crawl: {len(todo)} event(s) (cached ok: "
-              f"{sum(1 for c in captures.values() if c.get('status') == 'ok')})")
+    wanted = set(args.events) if args.events else None
+    todo = []
+    for key in sorted(inventory, key=lambda k: (-int(k.split("-")[1]), k)):
+        if wanted and key not in wanted:
+            continue
+        if key in captures and captures[key].get("status") == "ok" and not args.refresh:
+            continue
+        todo.append((key, inventory[key]))
+    if args.limit:
+        todo = todo[: args.limit]
+    wb_todo = [(k, e) for k, e in todo if e["year"] <= WAYBACK_MAX_YEAR]
+    live_todo = [(k, e) for k, e in todo if e["year"] > WAYBACK_MAX_YEAR]
+    print(f"to crawl: {len(todo)} event(s) "
+          f"(wayback {len(wb_todo)}, live {len(live_todo)}, "
+          f"cached ok {sum(1 for c in captures.values() if c.get('status') == 'ok')})")
 
-        for i, (key, event) in enumerate(todo):
-            print(f"[{i + 1}/{len(todo)}] {key} -> {event['urls'][0]}")
-            cap = crawl_event(pw, event)
-            _save_cache(cache_dir, key, cap)
-            captures[key] = cap
-            if cap.get("status") == "ok":
-                n = len(ds_mod.build_records(key, cap))
-                print(f"    ok: {cap['kind']} ({n} records)")
-            else:
-                print("    FAILED")
-            if i < len(todo) - 1:
-                pace()
+    for i, (key, event) in enumerate(wb_todo):
+        print(f"[{i + 1}/{len(wb_todo)}] {key} (wayback)")
+        cap = wayback_event(event)
+        _save_cache(cache_dir, key, cap)
+        captures[key] = cap
+        if cap.get("status") == "ok":
+            n = len(ds_mod.build_records(key, cap))
+            print(f"    ok: {cap['kind']} ({n} records, {cap.get('meta', {}).get('title')})")
+        else:
+            print("    FAILED (no usable wayback capture)")
+
+    if live_todo:
+        from playwright.sync_api import sync_playwright  # only for >=2026 events
+
+        from .capture import crawl_event, pace
+
+        with sync_playwright() as pw:
+            for i, (key, event) in enumerate(live_todo):
+                print(f"[{i + 1}/{len(live_todo)}] {key} (live) -> {event['urls'][0]}")
+                cap = crawl_event(pw, event)
+                _save_cache(cache_dir, key, cap)
+                captures[key] = cap
+                if cap.get("status") == "ok":
+                    n = len(ds_mod.build_records(key, cap))
+                    print(f"    ok: {cap['kind']} ({n} records)")
+                else:
+                    print("    FAILED")
+                if i < len(live_todo) - 1:
+                    pace()
 
     out = ds_mod.write_outputs(
         ds_mod.build_dataset(captures), captures, Path(args.out)
