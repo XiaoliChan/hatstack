@@ -24,12 +24,14 @@ def _is_challenge(title: str) -> bool:
 
 
 def clear_challenge(page, url: str, tries: int = 4, settle: int = 8) -> bool:
-    """goto + retry until the page is not a Cloudflare interstitial."""
+    """goto + retry until the page is not a Cloudflare interstitial. Fast-fails on HTTP >= 400."""
     for i in range(tries):
         try:
-            page.goto(url, timeout=60000, wait_until="domcontentloaded")
+            resp = page.goto(url, timeout=60000, wait_until="domcontentloaded")
         except Exception:
-            pass
+            resp = None
+        if resp is not None and resp.status >= 400 and resp.status not in (403, 429, 503):
+            return False  # 404 and friends: no point retrying
         time.sleep(settle)
         if not _is_challenge(page.title()):
             return True
@@ -113,11 +115,7 @@ def _capture_json(page, url: str, expected_year: int) -> dict | None:
                 continue
             # year validation: guard against microsite redirects to the
             # current-year event (e.g. /eu-24/ -> Europe 2026)
-            year_ok = (
-                f"/{expected_year}/" in resp.url
-                or str(expected_year) in title
-                or rendered > 0
-            )
+            year_ok = f"/{expected_year}/" in resp.url or str(expected_year) in title
             if year_ok and data:
                 return {
                     "status": "ok",

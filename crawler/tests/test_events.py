@@ -40,13 +40,12 @@ def test_parse_inventory_patterns():
 
 
 def test_url_candidates_order():
-    assert url_candidates("us", 2024)[0] == (
-        "https://www.blackhat.com/archive/usa/2024/briefings/schedule/index.html"
-    )
-    # US 2018 archive path does not exist yet -> microsite first
+    # microsite first everywhere: /archive/ HTML navigations are hard-blocked
+    assert url_candidates("us", 2024)[0].endswith("/us-24/briefings/schedule/index.html")
     assert url_candidates("us", 2018)[0].endswith("/us-18/briefings/schedule/index.html")
     assert url_candidates("asia", 2015)[0].endswith("/asia-15/briefings.html")
-    assert url_candidates("eu", 2020)[0] == (
+    assert url_candidates("eu", 2020)[0].endswith("/eu-20/briefings/schedule/index.html")
+    assert url_candidates("eu", 2020)[1] == (
         "https://www.blackhat.com/archive/europe/2020/briefings/schedule/index.html"
     )
 

@@ -85,23 +85,24 @@ def parse_inventory(html: str) -> dict[str, dict]:
                 ev["urls"].append(url)
                 ev["kinds"][url] = kind
             break
-    # JSON-era candidates first for years that have both
+    # within JSON-era, microsite paths first: /archive/ HTML navigations are
+    # hard-blocked by Cloudflare even in fresh browsers (probe + smoke evidence)
     for ev in events.values():
-        ev["urls"].sort(key=lambda u: 0 if ev["kinds"][u] == "json" else 1)
+        ev["urls"].sort(
+            key=lambda u: (0 if (ev["kinds"][u] == "json" and "/archive/" not in u)
+                           else 1 if ev["kinds"][u] == "json" else 2)
+        )
     return events
 
 
 def url_candidates(region: str, year: int) -> list[str]:
-    """Ordered candidate URLs for one event, /archive/ canonical path first."""
+    """Ordered candidate URLs for one event. Microsite paths first — Cloudflare
+    hard-blocks /archive/ HTML navigations; microsites pass the challenge."""
     long_r, yy = LONG_REGION[region], str(year)[2:]
     micro = f"https://www.blackhat.com/{region}-{yy}/briefings/schedule/index.html"
     arch = f"https://www.blackhat.com/archive/{long_r}/{year}/briefings/schedule/index.html"
-    if region == "us" and year == 2018:  # archive path starts 2019 for USA
-        json_urls = [micro, arch]
-    else:
-        json_urls = [arch, micro]
     if year >= 2018:
-        return json_urls
+        return [micro, arch]
     legacy = [
         f"https://www.blackhat.com/{region}-{yy}/briefings.html",
         f"https://www.blackhat.com/{region}-{yy}/archives.html",
