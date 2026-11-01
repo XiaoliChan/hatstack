@@ -1,16 +1,16 @@
 name: Egress Probe
 
-# Phase 0, iteration 5 — XHR instead of fetch.
-# v3/v4: window.fetch is unusable in-page (Transcend hijack + deeper blocks).
-# v2 proof: the page's OWN XHR fetched sessions.json 200/574KB.
-# Test A: plain XMLHttpRequest from the cleared page to every target path.
-# Test B (fallback if A dies): second microsite navigation + capture its own XHR.
+# Phase 0, iteration 6 — fresh browser process per event.
+# v5 verdict: in-page fetch AND XHR both dead; second nav in same context dead.
+# Hypothesis under test: a COMPLETE browser relaunch (new process, new context,
+# same runner IP) resets the per-session bot score, so "one browser per event"
+# works. Four sequential browsers: 3 JSON-era microsites + 1 legacy static page.
 
 on:
   workflow_dispatch:
 
 jobs:
-  xhr-probe:
+  fresh-browser-probe:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-python@v5
@@ -22,7 +22,7 @@ jobs:
           pip install playwright
           playwright install chromium --with-deps
 
-      - name: XHR probe
+      - name: Fresh-browser-per-event probe
         run: |
           python - <<'PY'
           import json, time
@@ -31,100 +31,20 @@ jobs:
           UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
           BASE = "https://www.blackhat.com"
 
-          XHR_JS = """(u) => new Promise((resolve, reject) => {
-              try {
-                  const x = new XMLHttpRequest();
-                  x.open('GET', u);
-                  x.withCredentials = true;
-                  x.timeout = 30000;
-                  x.onload = () => resolve({status: x.status, len: x.responseText.length, head: x.responseText.slice(0, 120)});
-                  x.onerror = () => reject(new Error('XHR network error'));
-                  x.ontimeout = () => reject(new Error('XHR timeout'));
-                  x.send();
-              } catch (e) { reject(e); }
-          })"""
+          EVENTS = [
+              ("browser1 us-24",  "/us-24/briefings/schedule/index.html"),
+              ("browser2 eu-24",  "/eu-24/briefings/schedule/index.html"),
+              ("browser3 asia-24", "/asia-24/briefings/schedule/index.html"),
+              ("browser4 us-16 legacy", "/us-16/briefings.html"),
+          ]
 
-          XHR_FULL = """(u) => new Promise((resolve, reject) => {
-              const x = new XMLHttpRequest();
-              x.open('GET', u);
-              x.withCredentials = true;
-              x.timeout = 30000;
-              x.onload = () => resolve(x.responseText);
-              x.onerror = () => reject(new Error('err'));
-              x.send();
-          })"""
-
-          def clear_until_ready(page, url, max_tries=4):
-              for i in range(max_tries):
-                  try:
-                      page.goto(url, timeout=60000, wait_until="domcontentloaded")
-                  except Exception as e:
-                      print("  goto error:", repr(e)[:150])
-                  time.sleep(8)
-                  t = page.title()
-                  print(f"  try {i}: title={t[:60]!r}")
-                  low = t.lower()
-                  if "moment" not in low and "attention" not in low:
-                      return True
-                  time.sleep(12)
-              return False
-
-          def xhr(page, label, url, pause=12):
-              print("-" * 60)
-              print(f"XHR [{label}]: {url}")
-              try:
-                  res = page.evaluate(XHR_JS, url)
-                  print(f"  STATUS {res['status']} | len {res['len']}")
-                  print(f"  HEAD {res['head'][:110]!r}")
-                  return res
-              except Exception as e:
-                  print("  XHR ERROR:", repr(e)[:200])
-                  return {"status": -1, "len": 0, "head": ""}
-              finally:
-                  time.sleep(pause)
-
-          with sync_playwright() as p:
-              browser = p.chromium.launch(args=["--no-sandbox"])
+          def run_one(pw, label, path):
+              print("=" * 60)
+              print(f"[{label}] launching FRESH browser for {path}")
+              browser = pw.chromium.launch(args=["--no-sandbox"])
               ctx = browser.new_context(user_agent=UA)
               page = ctx.new_page()
 
-              print("=" * 60)
-              print("TEST A: clear on us-24, then XHR everything")
-              ok = clear_until_ready(page, BASE + "/us-24/briefings/schedule/index.html")
-              print("CLEARED:", ok)
-              if ok:
-                  time.sleep(15)
-                  targets = [
-                      ("sessions us-24 control",  "/us-24/briefings/schedule/sessions.json"),
-                      ("sessions usa/2025",       "/archive/usa/2025/briefings/schedule/sessions.json"),
-                      ("sessions asia/2024",      "/archive/asia/2024/briefings/schedule/sessions.json"),
-                      ("sessions europe/2023",    "/archive/europe/2023/briefings/schedule/sessions.json"),
-                      ("sessions us-26 upcoming", "/us-26/briefings/schedule/sessions.json"),
-                      ("legacy static us-16",     "/us-16/briefings.html"),
-                      ("archives inventory",      "/html/archives.html"),
-                  ]
-                  results = {}
-                  for label, path in targets:
-                      results[label] = xhr(page, label, BASE + path)
-
-                  print("=" * 60)
-                  print("ITEM COUNTS for 200-OK sessions.json:")
-                  for label, path in targets:
-                      if "sessions" not in path:
-                          continue
-                      r = results.get(label, {})
-                      if r.get("status") == 200 and r.get("len", 0) > 1000:
-                          try:
-                              txt = page.evaluate(XHR_FULL, BASE + path)
-                              data = json.loads(txt)
-                              n = len(data) if isinstance(data, list) else len(data.get("sessions", data))
-                              print(f"  {label}: JSON_OK items={n}")
-                          except Exception as e:
-                              print(f"  {label}: parse error {repr(e)[:120]}")
-                          time.sleep(8)
-
-              print("=" * 60)
-              print("TEST B: second microsite nav + capture its own XHR (eu-24)")
               captured = []
               def on_response(resp):
                   try:
@@ -133,24 +53,51 @@ jobs:
                   except Exception:
                       pass
               page.on("response", on_response)
-              ok2 = clear_until_ready(page, BASE + "/eu-24/briefings/schedule/index.html")
-              print("TEST_B_CLEARED:", ok2)
-              if ok2:
+
+              ok = False
+              for i in range(4):
+                  try:
+                      page.goto(BASE + path, timeout=60000, wait_until="domcontentloaded")
+                  except Exception as e:
+                      print(f"  goto error: {repr(e)[:120]}")
+                  time.sleep(8)
+                  t = page.title()
+                  print(f"  try {i}: title={t[:60]!r}")
+                  low = t.lower()
+                  if "moment" not in low and "attention" not in low:
+                      ok = True
+                      break
+                  time.sleep(12)
+
+              print(f"  PASSED_CHALLENGE: {ok}")
+              if ok:
                   time.sleep(10)
                   li = page.locator("ul#cal_content_Day li").count()
-                  print("TEST_B_RENDERED_LI:", li)
-                  print("TEST_B_CAPTURED:", len(captured))
+                  print(f"  RENDERED_LI: {li}")
+                  print(f"  OWN_XHR_CAPTURED: {len(captured)}")
                   for r in captured:
                       try:
                           b = r.body()
-                          print(f"  CAPTURED {r.url[-70:]} status={r.status} bytes={len(b)}")
+                          extra = ""
                           try:
                               d = json.loads(b)
-                              print("  CAPTURED_JSON_OK items:", len(d) if isinstance(d, list) else -1)
+                              extra = f" items={len(d) if isinstance(d, list) else -1}"
                           except Exception:
-                              print("  CAPTURED_JSON: not json")
+                              pass
+                          print(f"    {r.url[-70:]} status={r.status} bytes={len(b)}{extra}")
                       except Exception as e:
-                          print("  capture read err:", repr(e)[:120])
+                          print("    read err:", repr(e)[:100])
+                  if "legacy" in label.lower():
+                      links = page.locator("a[href*='.pdf']").count()
+                      print(f"  LEGACY_PDF_LINKS_ON_PAGE: {links}")
 
               browser.close()
+              return ok
+
+          with sync_playwright() as pw:
+              for label, path in EVENTS:
+                  run_one(pw, label, path)
+                  print("  sleeping 45s before next browser...")
+                  time.sleep(45)
+          print("PROBE_COMPLETE")
           PY
