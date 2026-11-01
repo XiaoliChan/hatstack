@@ -36,7 +36,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: |
-          pip install beautifulsoup4 lxml pytest
+          pip install beautifulsoup4 lxml requests pytest
           python -m pytest crawler/tests -q
 
   crawl:
