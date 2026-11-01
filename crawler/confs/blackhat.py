@@ -42,6 +42,9 @@ def collect(ctx: dict) -> dict[str, dict]:
     cache_dir: Path = Path(ctx["cache_dir"])
     captures: dict[str, dict] = dict(ctx["cache_read"])
 
+    if ctx["use_cache"]:
+        return captures
+
     inventory = {}
     if not ctx["use_cache"]:
         html = wayback_inventory()

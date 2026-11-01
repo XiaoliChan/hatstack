@@ -117,6 +117,9 @@ def collect(ctx: dict) -> dict[str, dict]:
     def say(line: str):
         print(f"    {line}")
 
+    if ctx["use_cache"]:
+        return captures
+
     wanted = set(ctx["events"]) if ctx["events"] else None
     todo = []
     for year in YEARS:

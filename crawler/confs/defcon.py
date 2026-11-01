@@ -213,6 +213,9 @@ def collect(ctx: dict) -> dict[str, dict]:
     def say(line: str):
         print(f"    {line}")
 
+    if ctx["use_cache"]:
+        return captures
+
     root_entries = get_listing("", log=say)
     editions = [e.rstrip("/") for e in root_entries if _EDITION_RE.match(e)]
     editions.sort(key=lambda e: int(_EDITION_RE.match(e).group(1)), reverse=True)

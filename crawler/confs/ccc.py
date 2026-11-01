@@ -149,6 +149,9 @@ def collect(ctx: dict) -> dict[str, dict]:
     def say(line: str):
         print(f"    {line}")
 
+    if ctx["use_cache"]:
+        return captures
+
     confs = curated_conferences(log=say)
     say(f"{len(confs)} curated conferences")
 
