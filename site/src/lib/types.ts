@@ -29,6 +29,10 @@ export const CONF_NAMES: Record<string, string> = {
   ccc: "CCC",
   usenix: "USENIX",
   offensivecon: "OffensiveCon",
+  hitcon: "HITCON",
+  kcon: "KCon",
+  redteamvillage: "Red Team Village",
+  x33fcon: "x33fcon",
 }
 
 export function confName(id?: string): string {
