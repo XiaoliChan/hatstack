@@ -191,4 +191,31 @@ def write_outputs(dataset: dict, per_conf: dict[str, dict[str, dict]], out_dir: 
         json.dumps(report_json, ensure_ascii=False, indent=1), encoding="utf-8"
     )
     (out_dir / "report.md").write_text(report_md, encoding="utf-8")
+
+    # per-conference split files (mirrors the UI structure: manifest entry +
+    # editions + that conference's sessions); site keeps the aggregate file
+    by_dir = out_dir / "by-conference"
+    by_dir.mkdir(exist_ok=True)
+    report_dir = out_dir / "report"
+    report_dir.mkdir(exist_ok=True)
+    conf_meta = {c["id"]: c for c in dataset.get("conferences", [])}
+    for conf_id in conf_meta:
+        sessions = [s for s in dataset["sessions"] if s.get("conference", "blackhat") == conf_id]
+        atomic_write_json(by_dir / f"{conf_id}.json", {
+            "version": dataset["version"],
+            "conference": conf_meta[conf_id],
+            "editions": [e for e in dataset.get("editions", []) if e["conference"] == conf_id],
+            "sessions": sessions,
+        })
+    for cr in report_json.get("conferences", []):
+        rows = [
+            f"| {e['key']} | {e['status']} | {e['kind'] or '-'} | {e['sessions']} | {e['note'] or ''} |"
+            for e in cr["events"]
+        ]
+        (report_dir / f"{cr['id']}.md").write_text(
+            f"# {cr['id']} crawl report\n\n"
+            "| event | status | kind | sessions | note |\n|---|---|---|---|---|\n"
+            + "\n".join(rows) + "\n",
+            encoding="utf-8",
+        )
     return {"dataset": ds_path, "report_md": out_dir / "report.md", "report": out_dir / "report.json"}

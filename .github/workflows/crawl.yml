@@ -1,23 +1,17 @@
 name: Crawl
 
+# Parallel matrix: a setup job computes the conference list, one job per
+# conference crawls in parallel and uploads its cache; a single assemble job
+# merges all caches into the dataset and commits once (single writer).
+
 on:
   workflow_dispatch:
     inputs:
-      limit:
-        description: "crawl only first N events (0 = all)"
-        default: "0"
-      events:
-        description: "space separated event keys, e.g. 'us-24 asia-21' (optional)"
-        default: ""
       confs:
-        description: "conference ids to crawl (default: all registered)"
+        description: "space or comma separated conference ids (default: all)"
         default: ""
       refresh:
         description: "ignore cache, full re-crawl"
-        type: boolean
-        default: false
-      commit:
-        description: "commit dataset back to main after crawl"
         type: boolean
         default: false
   schedule:
@@ -26,26 +20,36 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: crawl
-  cancel-in-progress: false
-
 jobs:
-  tests:
+  setup:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: |
-          pip install beautifulsoup4 lxml requests pytest
-          python -m pytest crawler/tests -q
+      - id: set
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          default = ["blackhat","defcon","ccc","offensivecon","usenix",
+                     "x33fcon","redteamvillage","hitcon","kcon"]
+          raw = os.environ.get("CONFS", "").replace(",", " ").split()
+          confs = raw or default
+          print("matrix=" + json.dumps({"conf": confs}))
+          PY
+        env:
+          CONFS: ${{ inputs.confs || '' }}
 
   crawl:
     runs-on: ubuntu-latest
-    needs: tests
-    timeout-minutes: 300
+    timeout-minutes: 180
+    needs: setup
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    concurrency:
+      group: crawl-${{ matrix.conf }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -56,34 +60,59 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r crawler/requirements.txt
           playwright install chromium --with-deps
-      - name: Crawl
+      - name: Crawl ${{ matrix.conf }}
         run: |
           ARGS=""
-          [ "$LIMIT" != "0" ] && ARGS="$ARGS --limit $LIMIT"
-          [ -n "$EVENTS" ] && ARGS="$ARGS --events $EVENTS"
-          [ -n "$CONFS" ] && ARGS="$ARGS --confs $CONFS"
           [ "$REFRESH" = "true" ] && ARGS="$ARGS --refresh"
-          # -u: unbuffered stdout — a hard crash must never swallow the last
-          # log lines (that is exactly how the eu-2018 death went undiagnosed)
-          python -u -m crawler crawl --out dataset $ARGS
+          python -u -m crawler crawl --confs ${{ matrix.conf }} $ARGS --out /tmp/out
         env:
-          LIMIT: ${{ inputs.limit || '0' }}
-          EVENTS: ${{ inputs.events || '' }}
-          CONFS: ${{ inputs.confs || '' }}
           REFRESH: ${{ inputs.refresh || github.event_name == 'schedule' }}
+      - name: Upload cache artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cache-${{ matrix.conf }}
+          path: crawler/cache/${{ matrix.conf }}/
+          retention-days: 3
+
+  assemble:
+    runs-on: ubuntu-latest
+    needs: crawl
+    if: always()
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install beautifulsoup4 lxml requests pytest
+      - name: Run tests
+        run: python -m pytest crawler/tests -q
+      - name: Download all cache artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/artifacts
+          pattern: cache-*
+      - name: Merge caches and build dataset
+        run: |
+          mkdir -p crawler/cache
+          for d in /tmp/artifacts/cache-*; do
+            name="${d##*/cache-}"
+            mkdir -p "crawler/cache/$name"
+            cp -r "$d"/. "crawler/cache/$name/"
+          done
+          ls crawler/cache
+          python -u -m crawler crawl --use-cache --out dataset
+          cp -f dataset/dataset.json site/public/dataset.json
       - name: Upload dataset artifact
         uses: actions/upload-artifact@v4
         with:
           name: dataset
           path: dataset/
       - name: Commit dataset
-        if: ${{ inputs.commit == true || github.event_name == 'schedule' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # keep the site's committed copy in sync with dataset/ (prebuild also
-          # copies it, so a stale copy silently drifts)
-          cp -f dataset/dataset.json site/public/dataset.json
           git add dataset/ crawler/cache/ site/public/dataset.json
           if git diff --cached --quiet; then echo "no dataset changes"; exit 0; fi
           git commit -m "chore(data): refresh dataset (${{ github.run_id }})"
