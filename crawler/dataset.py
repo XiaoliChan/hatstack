@@ -13,6 +13,10 @@ REGION_ORDER = {"us": 0, "eu": 1, "asia": 2}
 def build_records(event_key: str, capture: dict, conference: str = "blackhat") -> list[dict]:
     if capture.get("status") != "ok":
         return []
+    if capture.get("kind") == "records":  # adapter pre-parsed (e.g. defcon)
+        for r in capture["records"]:
+            r["conference"] = conference
+        return capture["records"]
     region, year = event_key.split("-")[0], int(event_key.split("-")[1])
     event = {"region": region, "year": year, "source_url": capture.get("meta", {}).get("url")}
     if capture.get("kind") == "json":

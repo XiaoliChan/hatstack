@@ -9,6 +9,9 @@ on:
       events:
         description: "space separated event keys, e.g. 'us-24 asia-21' (optional)"
         default: ""
+      confs:
+        description: "conference ids to crawl (default: all registered)"
+        default: ""
       refresh:
         description: "ignore cache, full re-crawl"
         type: boolean
@@ -58,11 +61,13 @@ jobs:
           ARGS=""
           [ "$LIMIT" != "0" ] && ARGS="$ARGS --limit $LIMIT"
           [ -n "$EVENTS" ] && ARGS="$ARGS --events $EVENTS"
+          [ -n "$CONFS" ] && ARGS="$ARGS --confs $CONFS"
           [ "$REFRESH" = "true" ] && ARGS="$ARGS --refresh"
           python -m crawler crawl --out dataset $ARGS
         env:
           LIMIT: ${{ inputs.limit || '0' }}
           EVENTS: ${{ inputs.events || '' }}
+          CONFS: ${{ inputs.confs || '' }}
           REFRESH: ${{ inputs.refresh || github.event_name == 'schedule' }}
       - name: Upload dataset artifact
         uses: actions/upload-artifact@v4
@@ -77,4 +82,5 @@ jobs:
           git add dataset/
           if git diff --cached --quiet; then echo "no dataset changes"; exit 0; fi
           git commit -m "chore(data): refresh dataset (${{ github.run_id }})"
+          git pull --rebase origin main
           git push
