@@ -45,8 +45,17 @@ def cmd_crawl(args) -> int:
         }
         per_conf[adapter.ID] = adapter.collect(ctx)
 
+    prior: list[dict] = []
+    prior_path = Path(args.out) / "dataset.json"
+    if prior_path.exists():
+        try:
+            prior = json.loads(prior_path.read_text(encoding="utf-8")).get("sessions", [])
+            print(f"merging with committed dataset ({len(prior)} prior sessions)")
+        except Exception:
+            prior = []
+
     out = ds_mod.write_outputs(
-        ds_mod.build_dataset(per_conf), per_conf, Path(args.out)
+        ds_mod.build_dataset(per_conf, prior_sessions=prior), per_conf, Path(args.out)
     )
     print(f"dataset -> {out['dataset']}")
     print(f"report  -> {out['report_md']}")

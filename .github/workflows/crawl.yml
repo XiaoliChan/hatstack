@@ -79,7 +79,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add dataset/
+          git add dataset/ crawler/cache/
           if git diff --cached --quiet; then echo "no dataset changes"; exit 0; fi
           git commit -m "chore(data): refresh dataset (${{ github.run_id }})"
           git pull --rebase origin main

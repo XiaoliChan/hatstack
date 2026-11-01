@@ -28,11 +28,17 @@ def build_records(event_key: str, capture: dict, conference: str = "blackhat") -
     return records
 
 
-def build_dataset(per_conf: dict[str, dict[str, dict]]) -> dict:
+def build_dataset(per_conf: dict[str, dict[str, dict]], prior_sessions: list[dict] | None = None) -> dict:
     records: list[dict] = []
     for conf_id, captures in per_conf.items():
         for key in sorted(captures):
             records.extend(build_records(key, captures[key], conference=conf_id))
+    # merge: keep prior sessions from conferences NOT crawled this run, so a
+    # partial run (one adapter) never wipes the committed dataset
+    crawled_confs = set(per_conf.keys())
+    for s in prior_sessions or []:
+        if s.get("conference", "blackhat") not in crawled_confs:
+            records.append(s)
     seen: set[str] = set()
     unique = []
     for r in records:
