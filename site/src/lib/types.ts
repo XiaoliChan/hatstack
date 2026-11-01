@@ -49,7 +49,10 @@ export interface DatasetMeta {
 }
 
 export function metaOf(ds: Dataset): DatasetMeta {
-  const years = [...new Set(ds.sessions.map((s) => s.event.year))].sort((a, b) => b - a)
+  // year=0 means unknown (render-batch adapters) — never surface it as a chip
+  const years = [...new Set(ds.sessions.map((s) => s.event.year).filter((y) => y > 0))].sort(
+    (a, b) => b - a
+  )
   return {
     total: ds.sessions.length,
     withMaterials: ds.sessions.filter((s) => s.files.slides || s.files.whitepaper).length,

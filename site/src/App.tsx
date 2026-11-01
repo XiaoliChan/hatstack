@@ -62,8 +62,8 @@ export default function App() {
           if (filters.confs.size && !filters.confs.has(s.conference ?? "blackhat")) return false
           if (filters.regions.size && !filters.regions.has(s.event.region)) return false
           if (filters.years.size) {
-            const bucket =
-              s.event.year >= oldestIndividual ? String(s.event.year) : "old"
+            if (s.event.year <= 0) return false // unknown year: excluded from any year filter
+            const bucket = s.event.year >= oldestIndividual ? String(s.event.year) : "old"
             if (!filters.years.has(bucket)) return false
           }
           return true

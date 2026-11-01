@@ -61,7 +61,8 @@ def build_dataset(per_conf: dict[str, dict[str, dict]], prior_sessions: list[dic
             continue
         seen.add(r["id"])
         unique.append(r)
-    unique.sort(key=lambda r: (-r["event"]["year"], REGION_ORDER.get(r["event"]["region"], 9), r["title"].lower()))
+    unique.sort(key=lambda r: (-r["event"]["year"] if r["event"]["year"] > 0 else 1,
+                               REGION_ORDER.get(r["event"]["region"], 9), r["title"].lower()))
     conferences = sorted(
         {r["conference"] for r in unique}
         | {c for c, caps in per_conf.items() if any(v.get("status") == "ok" for v in caps.values())}
