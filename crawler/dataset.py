@@ -10,6 +10,14 @@ from .parse import parse_event_json, parse_legacy_html
 REGION_ORDER = {"us": 0, "eu": 1, "asia": 2}
 
 
+def atomic_write_json(path: Path, data) -> None:
+    """Write JSON via tmp+rename so a killed run never leaves a truncated
+    cache file that silently vanishes from --use-cache rebuilds."""
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(path)
+
+
 def build_records(event_key: str, capture: dict, conference: str = "blackhat") -> list[dict]:
     if capture.get("status") != "ok":
         return []
@@ -30,14 +38,21 @@ def build_records(event_key: str, capture: dict, conference: str = "blackhat") -
 
 def build_dataset(per_conf: dict[str, dict[str, dict]], prior_sessions: list[dict] | None = None) -> dict:
     records: list[dict] = []
+    captured: set[tuple[str, str, int]] = set()
     for conf_id, captures in per_conf.items():
         for key in sorted(captures):
-            records.extend(build_records(key, captures[key], conference=conf_id))
-    # merge: keep prior sessions from conferences NOT crawled this run, so a
-    # partial run (one adapter) never wipes the committed dataset
-    crawled_confs = set(per_conf.keys())
+            recs = build_records(key, captures[key], conference=conf_id)
+            records.extend(recs)
+            if captures[key].get("status") == "ok":
+                for r in recs:
+                    captured.add((conf_id, r["event"]["region"], r["event"]["year"]))
+    # merge: keep prior sessions for events this run did not capture ok, so a
+    # partial run (or an adapter that ran but captured nothing) never wipes
+    # the committed dataset
     for s in prior_sessions or []:
-        if s.get("conference", "blackhat") not in crawled_confs:
+        conf = s.setdefault("conference", "blackhat")
+        ev = s.get("event", {})
+        if (conf, ev.get("region"), ev.get("year")) not in captured:
             records.append(s)
     seen: set[str] = set()
     unique = []
@@ -48,7 +63,8 @@ def build_dataset(per_conf: dict[str, dict[str, dict]], prior_sessions: list[dic
         unique.append(r)
     unique.sort(key=lambda r: (-r["event"]["year"], REGION_ORDER.get(r["event"]["region"], 9), r["title"].lower()))
     conferences = sorted(
-        c for c, caps in per_conf.items() if any(v.get("status") == "ok" for v in caps.values())
+        {r["conference"] for r in unique}
+        | {c for c, caps in per_conf.items() if any(v.get("status") == "ok" for v in caps.values())}
     )
     return {
         "version": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -71,26 +87,31 @@ def build_report(per_conf: dict[str, dict[str, dict]], dataset: dict) -> tuple[s
         "| event | status | kind | sessions | note |",
         "|---|---|---|---|---|",
     ]
-    per_event: dict[str, int] = {}
-    for r in dataset["sessions"]:
-        k = f"{r['conference']}/{r['event']['region']}-{r['event']['year']}"
-        per_event[k] = per_event.get(k, 0) + 1
+    def _year_sort_key(key: str) -> tuple[int, str]:
+        parts = key.split("-")
+        year = -int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
+        return (year, key)
+
     report_events = {}
     for conf_id, captures in per_conf.items():
-        for key in sorted(captures, key=lambda k: (-int(k.split("-")[1]) if k.split("-")[1].isdigit() else 0, k)):
+        for key in sorted(captures, key=_year_sort_key):
             row_key = f"{conf_id}/{key}"
             cap = captures[key]
             meta = cap.get("meta", {})
             trace = meta.get("trace") or []
             base_note = f"li={cap.get('rendered_li')}" if cap.get("kind") == "json" else ""
             note = (base_note + " | " + trace[-1]) if trace else base_note
+            # count this capture's own records — the capture key ("dc-33",
+            # "38c3") doesn't match the dataset's region-year row keys, so
+            # tallying from dataset sessions always showed 0
+            n = len(build_records(key, cap, conference=conf_id))
             lines.append(
-                f"| {row_key} | {cap.get('status','?')} | {cap.get('kind','-')} | {per_event.get(row_key, 0)} | {note} |"
+                f"| {row_key} | {cap.get('status','?')} | {cap.get('kind','-')} | {n} | {note} |"
             )
             report_events[row_key] = {
                 "status": cap.get("status"),
                 "kind": cap.get("kind"),
-                "sessions": per_event.get(row_key, 0),
+                "sessions": n,
                 "url": meta.get("url"),
                 "title": meta.get("title"),
             }

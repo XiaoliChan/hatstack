@@ -29,7 +29,8 @@ def _load_conf_caches(cache_root: Path, ids: list[str] | None) -> dict[str, dict
             for f in sorted(cdir.glob("*.json")):
                 try:
                     caps[f.stem] = json.loads(f.read_text(encoding="utf-8"))
-                except Exception:
+                except Exception as e:
+                    print(f"warning: unreadable cache file {f.name}: {e!r}")
                     continue
         per_conf[adapter.ID] = caps
     return per_conf
@@ -37,7 +38,9 @@ def _load_conf_caches(cache_root: Path, ids: list[str] | None) -> dict[str, dict
 
 def cmd_crawl(args) -> int:
     cache_root = Path(args.cache_dir)
-    per_conf: dict[str, dict[str, dict]] = {}
+    # prefill with cached captures so ctx["cache_read"] is real data, not a
+    # misleading always-empty dict
+    per_conf: dict[str, dict[str, dict]] = _load_conf_caches(cache_root, args.confs)
     for adapter in confs.adapters(args.confs):
         print(f"=== {adapter.NAME} ({adapter.ID}) ===")
         ctx = {

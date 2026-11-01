@@ -27,9 +27,7 @@ def _load_cache(cache_dir: Path) -> dict[str, dict]:
 
 def _save_cache(cache_dir: Path, key: str, capture: dict):
     cache_dir.mkdir(parents=True, exist_ok=True)
-    (cache_dir / f"{key}.json").write_text(
-        json.dumps(capture, ensure_ascii=False), encoding="utf-8"
-    )
+    ds_mod.atomic_write_json(cache_dir / f"{key}.json", capture)
 
 
 def _prepare_inventory(inventory: dict[str, dict]) -> dict[str, dict]:

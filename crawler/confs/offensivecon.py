@@ -14,6 +14,7 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 from crawler.net import curl_get
+from crawler.dataset import atomic_write_json
 
 ID = "offensivecon"
 NAME = "OffensiveCon"
@@ -49,11 +50,15 @@ def collect_year(year: int, log=None) -> dict:
         title = re.sub(r"\s*-\s*(KEYNOTE|WORKSHOP)\s*$", "", title)
         abstract = item.find("p", class_="intro")
         speakers = []
+        seen_names: set[str] = set()
         for a in item.select("a"):
             name = a.get_text(" ", strip=True)
             if re.fullmatch(r"(read more|more|→|.+ →)", name, re.I):
-                continue
-            if 2 < len(name) < 60:
+                # the real speaker name lives in the anchor's title attribute
+                # ("<a title="Perri Adams">Read more</a>")
+                name = (a.get("title") or "").strip()
+            if 2 < len(name) < 60 and name.lower() not in seen_names:
+                seen_names.add(name.lower())
                 speakers.append({"name": name, "company": None, "role": None})
         records.append(
             {
@@ -118,9 +123,7 @@ def collect(ctx: dict) -> dict[str, dict]:
             traceback.print_exc()
             print(f"    ERROR: {e!r} — continuing")
             cap = {"status": "failed", "meta": {"trace": [f"exception: {e!r}"]}}
-        (cache_dir / f"{key}.json").write_text(
-            json.dumps(cap, ensure_ascii=False), encoding="utf-8"
-        )
+        atomic_write_json(cache_dir / f"{key}.json", cap)
         captures[key] = cap
         if cap.get("status") == "ok":
             print(f"    ok: {len(cap['records'])} talks")

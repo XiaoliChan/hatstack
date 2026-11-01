@@ -10,6 +10,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
+from crawler.dataset import atomic_write_json
 from crawler.render import rendered_html
 
 ID = "x33fcon"
@@ -90,7 +91,7 @@ def collect(ctx: dict) -> dict[str, dict]:
     if not html:
         cap = {"status": "failed", "meta": {"trace": ["render failed"]}}
         captures["all"] = cap
-        (cache_dir / "all.json").write_text(json.dumps(cap), encoding="utf-8")
+        atomic_write_json(cache_dir / "all.json", cap)
         return captures
     records = parse_rendered(html)
     print(f"    rendered {len(html)}B -> {len(records)} talks")
@@ -102,9 +103,7 @@ def collect(ctx: dict) -> dict[str, dict]:
                  "trace": [f"rendered {len(html)}B, {len(records)} talks",
                            "structure: " + ("rich" if records else "unknown — inspect cache")]},
     }
-    (cache_dir / "all.json").write_text(
-        json.dumps(cap, ensure_ascii=False), encoding="utf-8"
-    )
+    atomic_write_json(cache_dir / "all.json", cap)
     (cache_dir / "rendered.html").write_text(html, encoding="utf-8")  # for structure iteration
     captures["all"] = cap
     return captures

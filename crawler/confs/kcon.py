@@ -10,6 +10,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
+from crawler.dataset import atomic_write_json
 from crawler.render import rendered_html
 
 ID = "kcon"
@@ -98,6 +99,6 @@ def collect(ctx: dict) -> dict[str, dict]:
                 }
                 break
     print(f"    {best['meta'].get('trace', [])[-1]}")
-    (cache_dir / "all.json").write_text(json.dumps(best, ensure_ascii=False), encoding="utf-8")
+    atomic_write_json(cache_dir / "all.json", best)
     captures["all"] = best
     return captures

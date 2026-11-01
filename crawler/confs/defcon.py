@@ -17,6 +17,8 @@ from urllib.parse import unquote, urljoin
 
 import requests
 
+from crawler.dataset import atomic_write_json
+
 ID = "defcon"
 NAME = "DEF CON"
 BASE = "https://media.defcon.org/"
@@ -59,6 +61,8 @@ def _http_get(path: str) -> tuple[int, str]:
 
 def get_listing(path: str, log=None) -> list[str]:
     """Entries (files+dirs) of an autoindex path, percent-decoded."""
+    import html
+
     for attempt in range(3):
         code, text = _http_get(path)
         time.sleep(1.0)
@@ -76,13 +80,23 @@ def get_listing(path: str, log=None) -> list[str]:
         for h in hrefs:
             if h.startswith(("http", "/", "#")):
                 continue
-            out.append(unquote(h))
+            out.append(unquote(html.unescape(h)))
         return out
     return []
 
 
 def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:60] or "untitled"
+
+
+def clean_title(title: str) -> str:
+    """Strip automated markers media.defcon.org carries in filenames
+    ('- PDF v1', '- v2', '- MEDIA SERVER Belgi', ' (2)') so they don't
+    pollute titles or split one talk into near-duplicate sessions."""
+    title = re.sub(r"\s*-\s*media\s*server\b.*$", "", title, flags=re.I)
+    title = re.sub(r"\s*-\s*(?:pdf\s*)?v\d+$", "", title, flags=re.I)
+    title = re.sub(r"\s*\(\d+\)$", "", title)
+    return title.strip()
 
 
 def parse_filename(name: str, edition_num: int) -> dict | None:
@@ -99,9 +113,9 @@ def parse_filename(name: str, edition_num: int) -> dict | None:
         track = parts.pop(0)
         track = track.replace("Vilage", "Village")
     if len(parts) >= 2:
-        speakers, title = parts[0], " - ".join(parts[1:])
+        speakers, title = parts[0], clean_title(" - ".join(parts[1:]))
     else:
-        speakers, title = "", parts[0]
+        speakers, title = "", clean_title(parts[0])
     return {
         "title": title,
         "speakers_text": speakers,
@@ -111,10 +125,12 @@ def parse_filename(name: str, edition_num: int) -> dict | None:
 
 def _match_video(videos: list[dict], talk: dict) -> str | None:
     """villages mp4s are 'Village - Title - Speakers'; presentations mp4s match
-    the pdf stem minus suffix. Match on normalized title containment."""
+    the pdf stem minus suffix. Match on normalized title containment; village
+    names compare case-insensitively (spelling varies across filenames)."""
     t = talk["title"].lower()
+    talk_track = (talk["track"] or "").casefold()
     for v in videos:
-        if v["track"] == talk["track"] and (
+        if (v["track"] or "").casefold() == talk_track and (
             t in v["title"].lower() or v["title"].lower() in t
         ):
             return v["url"]
@@ -128,7 +144,6 @@ def collect_edition(edition: str, log=None) -> dict:
     year = 1992 + num
     label = f"DC {num}"
     listing_path = f"{edition}/{edition} presentations/"
-    villages_url = urljoin(BASE, f"{edition}/{edition} villages/")
     files = get_listing(listing_path, log=log)
     say = log or (lambda s: None)
     say(f"{listing_path}: {len(files)} entries")
@@ -136,19 +151,28 @@ def collect_edition(edition: str, log=None) -> dict:
         return {"status": "failed", "meta": {"trace": [f"no presentations dir for {edition}"]}}
 
     village_files: list[str] = []
+    village_dir = f"{edition}/{edition} villages/"
     for vname in (f"{edition} villages/", f"{edition} villages and creators/"):
-        villages_path = f"{edition}/{vname}"
-        village_files = get_listing(villages_path, log=log)
-        if village_files:
+        candidate = f"{edition}/{vname}"
+        got = get_listing(candidate, log=log)
+        if got:
+            village_dir, village_files = candidate, got
             break
 
     records: list[dict] = []
     pdfs: list[tuple[str, dict]] = []
     videos: list[dict] = []
 
-    for name in files + village_files:
-        base_dir = listing_path if name in files else villages_url
-        url = urljoin(urljoin(BASE, base_dir), name.replace(" ", "%20"))
+    def _file_url(dir_path: str, name: str) -> str:
+        # percent-encode the whole path (autoindex names carry spaces raw)
+        from urllib.parse import quote
+
+        return urljoin(BASE, quote(f"{dir_path}{name}", safe="/%"))
+
+    for source_dir, name in (
+        [(listing_path, n) for n in files] + [(village_dir, n) for n in village_files]
+    ):
+        url = _file_url(source_dir, name)
         if name.lower().endswith(".pdf"):
             parsed = parse_filename(name, num)
             if parsed:
@@ -160,7 +184,7 @@ def collect_edition(edition: str, log=None) -> dict:
             track = None
             if parts and parts[0].lower().rstrip("s").endswith(("village", "vilage")):
                 track = parts.pop(0).replace("Vilage", "Village")
-            videos.append({"track": track, "title": " - ".join(parts), "url": url})
+            videos.append({"track": track, "title": clean_title(" - ".join(parts)), "url": url})
 
     seen: set[str] = set()
     for url, parsed in pdfs:
@@ -171,7 +195,7 @@ def collect_edition(edition: str, log=None) -> dict:
         speakers = [
             {"name": s.strip(), "company": None, "role": None}
             for s in re.split(r"\s{2,}|,|&| and ", parsed["speakers_text"])
-            if 2 < len(s.strip()) < 40
+            if len(s.strip()) >= 2 and len(s.strip()) < 40 and s.strip().lower() != "phd"
         ]
         records.append(
             {
@@ -183,7 +207,7 @@ def collect_edition(edition: str, log=None) -> dict:
                 "track": parsed["track"],
                 "files": {"slides": url, "whitepaper": None, "tool": None},
                 "video_url": _match_video(videos, parsed),
-                "source_url": urljoin(BASE, listing_path),
+                "source_url": _file_url(edition + "/", f"{edition} presentations/"),
             }
         )
     say(f"{edition}: {len(records)} talks ({len(village_files)} village files)")
@@ -191,7 +215,7 @@ def collect_edition(edition: str, log=None) -> dict:
         "status": "ok",
         "kind": "records",
         "records": records,
-        "meta": {"source": "media.defcon.org", "url": urljoin(BASE, listing_path),
+        "meta": {"source": "media.defcon.org", "url": _file_url(edition + "/", f"{edition} presentations/"),
                  "title": edition, "trace": []},
     }
 
@@ -244,9 +268,7 @@ def collect(ctx: dict) -> dict[str, dict]:
             traceback.print_exc()
             print(f"    ERROR: {e!r} — continuing")
             cap = {"status": "failed", "meta": {"trace": [f"exception: {e!r}"]}}
-        (cache_dir / f"{key}.json").write_text(
-            json.dumps(cap, ensure_ascii=False), encoding="utf-8"
-        )
+        atomic_write_json(cache_dir / f"{key}.json", cap)
         captures[key] = cap
         if cap.get("status") == "ok":
             print(f"    ok: {len(cap['records'])} talks")

@@ -15,6 +15,7 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 from crawler.net import curl_get
+from crawler.dataset import atomic_write_json
 
 ID = "usenix"
 NAME = "USENIX Security"
@@ -26,23 +27,39 @@ def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:60] or "untitled"
 
 
+# Institution/affiliation markers (multi-language, case-insensitive). Segments
+# matching this are affiliations, never speaker names — the old English-only,
+# case-sensitive list let "Université de Lorraine", "CNRS", "ANSSI", … through.
+_ORG_HINT_RE = re.compile(
+    r"(?i)\d|universit|institut|laborator|center|centre|college|school|academy|akademie"
+    r"|\b(?:lab|inc|corp|ltd|llc|gmbh|univ|cnrs|inria|loria|limos|anssi|cea|inp|epfl|eth|mines|isep)\b"
+)
+
+
 def parse_people(text: str) -> list[dict]:
     """"Cassidy Gibson and Daniel Olszewski, University of Florida; Name, MIT"
-    -> [{name, company}, ...] (names within a block share the affiliation)."""
+    -> [{name, company}, ...]. Names within a block share the block's first
+    affiliation segment; segments that look like institutions never become
+    speakers."""
     speakers = []
     for block in re.split(r"[;·]|·", text):
         block = block.strip(" ,;")
         if not block:
             continue
-        if "," in block:
-            names_part, _, affil = block.rpartition(",")
-            affil = affil.strip()
-        else:
-            names_part, affil = block, ""
-        for name in re.split(r"\s+and\s+|,", names_part):
-            name = name.strip()
-            if 2 < len(name) < 60 and not re.search(r"\d|University|Lab|Inc|Corp|Institute", name):
-                speakers.append({"name": name, "company": affil or None, "role": None})
+        segments = [s.strip() for s in block.split(",") if s.strip()]
+        names: list[str] = []
+        affil = None
+        for seg in segments:
+            if _ORG_HINT_RE.search(seg):
+                if affil is None:
+                    affil = seg
+                continue
+            for name in re.split(r"\s+and\s+", seg):
+                name = re.sub(r"^and\s+", "", name.strip(" ."))
+                if 2 < len(name) < 60:
+                    names.append(name)
+        for name in names:
+            speakers.append({"name": name, "company": affil, "role": None})
     return speakers[:8]
 
 
@@ -142,9 +159,7 @@ def collect(ctx: dict) -> dict[str, dict]:
             traceback.print_exc()
             print(f"    ERROR: {e!r} — continuing")
             cap = {"status": "failed", "meta": {"trace": [f"exception: {e!r}"]}}
-        (cache_dir / f"{key}.json").write_text(
-            json.dumps(cap, ensure_ascii=False), encoding="utf-8"
-        )
+        atomic_write_json(cache_dir / f"{key}.json", cap)
         captures[key] = cap
         if cap.get("status") == "ok":
             print(f"    ok: {len(cap['records'])} papers")

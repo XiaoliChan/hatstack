@@ -13,6 +13,7 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 from crawler.wayback import wayback_get
+from crawler.dataset import atomic_write_json
 
 ID = "hitcon"
 NAME = "HITCON"
@@ -134,9 +135,7 @@ def collect(ctx: dict) -> dict[str, dict]:
             traceback.print_exc()
             print(f"    ERROR: {e!r} — continuing")
             cap = {"status": "failed", "meta": {"trace": [f"exception: {e!r}"]}}
-        (cache_dir / f"{key}.json").write_text(
-            json.dumps(cap, ensure_ascii=False), encoding="utf-8"
-        )
+        atomic_write_json(cache_dir / f"{key}.json", cap)
         captures[key] = cap
         if cap.get("status") == "ok":
             print(f"    ok: {len(cap['records'])} talks")

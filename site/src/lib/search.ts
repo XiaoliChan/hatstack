@@ -20,7 +20,11 @@ export function buildIndex(sessions: Session[]): MiniSearch<{
   mini.addAll(
     sessions.map((s) => {
       const words =
-        `${s.title} ${s.abstract}`.toLowerCase().split(/[^a-z0-9+#.]+/).filter(Boolean)
+        `${s.title} ${s.abstract}`
+          .toLowerCase()
+          // unicode-aware: umlauts/ß are letters, not token boundaries
+          .split(/[^\p{L}\p{N}+#.]+/u)
+          .filter(Boolean)
       // adjacent-token concatenations: "zero day" -> "zeroday",
       // so separator-less queries match hyphenated/spaced text and vice versa
       const compound = new Set<string>()
@@ -59,7 +63,10 @@ export function runSearch(
     merged.set(r.id, (merged.get(r.id) ?? 0) + r.score)
   }
   // separator-less variant: "zero day" also matches text written "zeroday"
-  const tokens = query.toLowerCase().split(/[^a-z0-9+#.]+/).filter((t) => t.length >= 2)
+  const tokens = query
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}+#.]+/u)
+    .filter((t) => t.length >= 2)
   if (tokens.length >= 2) {
     for (const r of index.search(tokens.join(""), opts)) {
       merged.set(r.id, (merged.get(r.id) ?? 0) + r.score)
@@ -74,7 +81,7 @@ export function runSearch(
 export function queryTerms(query: string): string[] {
   const tokens = query
     .toLowerCase()
-    .split(/[^a-z0-9+#.-]+/)
+    .split(/[^\p{L}\p{N}+#.-]+/u)
     .filter((t) => t.length >= 2)
     .slice(0, 8)
   if (tokens.length >= 2) {
