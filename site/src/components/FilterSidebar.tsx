@@ -78,35 +78,37 @@ export function FilterSidebar({
       {groups.map((g) => (
         <div key={g.conf.id} className="mt-5">
           <div className="flex items-center justify-between gap-2 mb-1 group/row pr-1">
-            <button
-              type="button"
-              onClick={() => toggleConf(g)}
-              title={confActive(g) ? "Show all conferences" : `Show only ${g.conf.name}`}
-              className={cn(
-                "flex-1 min-w-0 text-left text-[14px] font-semibold truncate rounded-md px-2.5 py-1 transition-colors",
-                confActive(g) ? "bg-accent" : "hover:text-foreground/70"
+            <div className="flex items-center gap-1 min-w-0">
+              <button
+                type="button"
+                onClick={() => toggleConf(g)}
+                title={confActive(g) ? "Show all conferences" : `Show only ${g.conf.name}`}
+                className={cn(
+                  "min-w-0 text-left text-[14px] font-semibold truncate rounded-md px-2.5 py-1 transition-colors",
+                  confActive(g) ? "bg-accent" : "hover:text-foreground/70"
+                )}
+              >
+                {g.conf.name}
+              </button>
+              {g.conf.url && (
+                <a
+                  href={g.conf.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={`${g.conf.name} official site`}
+                  className="shrink-0 p-1 text-muted-foreground/0 group-hover/row:text-muted-foreground hover:!text-foreground transition-colors"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <path d="M15 3h6v6" />
+                    <path d="M10 14 21 3" />
+                  </svg>
+                </a>
               )}
-            >
-              {g.conf.name}
-            </button>
+            </div>
             <span className="tabular-nums text-xs text-muted-foreground shrink-0">
               {g.count.toLocaleString()}
             </span>
-            {g.conf.url && (
-              <a
-                href={g.conf.url}
-                target="_blank"
-                rel="noreferrer"
-                title={`${g.conf.name} official site`}
-                className="shrink-0 p-1 text-muted-foreground/0 group-hover/row:text-muted-foreground hover:!text-foreground transition-colors"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                  <path d="M15 3h6v6" />
-                  <path d="M10 14 21 3" />
-                </svg>
-              </a>
-            )}
           </div>
           {g.conf.description && (
             <p className="px-2.5 mb-1.5 text-[11.5px] leading-snug text-muted-foreground/80">
