@@ -79,6 +79,11 @@ export default function App() {
 
   const terms = useMemo(() => new Set(queryTerms(debounced)), [debounced])
 
+  const filtersActive = filters.regions.size > 0 || filters.years.size > 0
+  const showResults = debounced !== "" || filtersActive
+
+  const SUGGESTIONS = ["kerberos", "active directory", "windows kernel", "dns", "zero-day", "supply chain"]
+
   useEffect(() => {
     const el = sentinel.current
     if (!el) return
@@ -128,6 +133,28 @@ export default function App() {
         </div>
 
         <main className="mt-4" aria-live="polite">
+          {meta && !showResults && (
+            <div className="py-14 text-center">
+              <p className="text-sm text-muted-foreground">
+                Type to search {meta.total.toLocaleString()} talks — or pick a starting point:
+              </p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setQuery(s)}
+                    className="rounded-full border border-line px-3.5 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-6 text-xs text-muted-foreground/70">
+                Or filter by region and year above to browse a single event.
+              </p>
+            </div>
+          )}
           {loadError && (
             <p className="py-10 text-sm text-muted-foreground">
               Couldn't load the dataset. Refresh the page, or check the{" "}
@@ -142,7 +169,7 @@ export default function App() {
               .
             </p>
           )}
-          {dataset && results.length === 0 && (
+          {dataset && showResults && results.length === 0 && (
             <div className="py-10 text-sm text-muted-foreground">
               <p>No talks match {debounced ? `“${debounced}”` : "these filters"}.</p>
               <button
@@ -157,11 +184,11 @@ export default function App() {
               </button>
             </div>
           )}
-          {results.slice(0, visible).map((s) => (
+          {showResults && results.slice(0, visible).map((s) => (
             <ResultRow key={s.id} s={s} terms={terms} />
           ))}
           <div ref={sentinel} />
-          {results.length > visible && (
+          {showResults && results.length > visible && (
             <div className="py-8 text-center">
               <button
                 type="button"
