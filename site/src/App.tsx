@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { FilterSidebar, type Filters } from "@/components/FilterSidebar"
 import { ResultRow } from "@/components/ResultRow"
 import { SearchBox } from "@/components/SearchBox"
@@ -16,9 +16,8 @@ export default function App() {
   )
   const [debounced, setDebounced] = useState(query)
   const [filters, setFilters] = useState<Filters>({ confs: new Set(), regions: new Set(), years: new Set() })
-  const [visible, setVisible] = useState(PAGE)
+  const [page, setPage] = useState(1)
   const [showFilters, setShowFilters] = useState(false)
-  const sentinel = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     // cache-bust: Pages caches dataset.json ~10min and stale data after a
@@ -43,10 +42,10 @@ export default function App() {
     else params.delete("q")
     const qs = params.toString()
     window.history.replaceState(null, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname)
-    setVisible(PAGE)
+    setPage(1)
   }, [debounced])
 
-  useEffect(() => setVisible(PAGE), [filters])
+  useEffect(() => setPage(1), [filters])
 
   const index = useMemo(() => (dataset ? buildIndex(dataset.sessions) : null), [dataset])
   const meta = useMemo(() => (dataset ? metaOf(dataset) : null), [dataset])
@@ -104,18 +103,16 @@ export default function App() {
 
   const SUGGESTIONS = ["kerberos", "active directory", "windows kernel", "dns", "zero-day", "supply chain"]
 
-  useEffect(() => {
-    const el = sentinel.current
-    if (!el) return
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) setVisible((v) => v + PAGE)
-      },
-      { rootMargin: "600px" }
-    )
-    io.observe(el)
-    return () => io.disconnect()
-  }, [sentinel])
+  const totalPages = Math.max(1, Math.ceil(results.length / PAGE))
+  const pageRows = results.slice((page - 1) * PAGE, page * PAGE)
+  const pageNumbers = useMemo(() => {
+    const nums: (number | "…")[] = []
+    for (let i = 1; i <= totalPages; i++) {
+      if (i <= 2 || i > totalPages - 2 || Math.abs(i - page) <= 1) nums.push(i)
+      else if (nums[nums.length - 1] !== "…") nums.push("…")
+    }
+    return nums
+  }, [page, totalPages])
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
@@ -229,20 +226,48 @@ export default function App() {
                 </button>
               </div>
             )}
-            {showResults && results.slice(0, visible).map((s) => (
+            {showResults && pageRows.map((s) => (
               <ResultRow key={s.id} s={s} terms={terms} />
             ))}
-            <div ref={sentinel} />
-            {showResults && results.length > visible && (
-              <div className="py-8 text-center">
+            {showResults && totalPages > 1 && (
+              <nav className="flex items-center justify-center gap-2 py-8" aria-label="Pagination">
                 <button
                   type="button"
-                  className="border border-line rounded-full px-5 py-2 text-[13px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
-                  onClick={() => setVisible((v) => v + PAGE)}
+                  disabled={page === 1}
+                  onClick={() => { setPage((p) => p - 1); window.scrollTo({ top: 0 }) }}
+                  className="h-8 px-3 rounded-md border border-line text-[13px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors disabled:opacity-30 disabled:pointer-events-none"
                 >
-                  show more ({results.length - visible} left)
+                  prev
                 </button>
-              </div>
+                {pageNumbers.map((n, i) =>
+                  n === "…" ? (
+                    <span key={`e${i}`} className="text-muted-foreground/60 text-[13px] px-1">…</span>
+                  ) : (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => { setPage(n); window.scrollTo({ top: 0 }) }}
+                      aria-current={n === page ? "page" : undefined}
+                      className={
+                        "h-8 min-w-8 px-2 rounded-md text-[13px] tabular-nums transition-colors " +
+                        (n === page
+                          ? "bg-foreground text-background"
+                          : "border border-line text-muted-foreground hover:text-foreground hover:border-foreground/40")
+                      }
+                    >
+                      {n}
+                    </button>
+                  )
+                )}
+                <button
+                  type="button"
+                  disabled={page === totalPages}
+                  onClick={() => { setPage((p) => p + 1); window.scrollTo({ top: 0 }) }}
+                  className="h-8 px-3 rounded-md border border-line text-[13px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                >
+                  next
+                </button>
+              </nav>
             )}
           </main>
         </div>

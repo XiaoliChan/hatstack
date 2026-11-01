@@ -40,6 +40,24 @@ export function confName(id?: string): string {
   return CONF_NAMES[id] ?? id
 }
 
+/** Compact hyphen-safe names for row badges: BlackHat-US-2024, DEFCON-2024 */
+export function confShort(id?: string): string {
+  if (!id) return "BlackHat"
+  return (CONF_SHORT[id] ?? CONF_NAMES[id] ?? id).replace(/\s+/g, "")
+}
+
+const CONF_SHORT: Record<string, string> = {
+  blackhat: "BlackHat",
+  defcon: "DEFCON",
+  ccc: "CCC",
+  usenix: "USENIX",
+  offensivecon: "OffensiveCon",
+  hitcon: "HITCON",
+  kcon: "KCon",
+  redteamvillage: "RTV",
+  x33fcon: "x33fcon",
+}
+
 export interface DatasetMeta {
   total: number
   withMaterials: number

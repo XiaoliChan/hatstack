@@ -7,11 +7,26 @@ export interface Filters {
   years: Set<string> // "2024" … or "old" for the long tail
 }
 
-function Group({ title, children }: { title: string; children: React.ReactNode }) {
+function Group({
+  title,
+  allActive,
+  allCount,
+  onAll,
+  children,
+}: {
+  title: string
+  allActive: boolean
+  allCount: number
+  onAll: () => void
+  children: React.ReactNode
+}) {
   return (
     <div className="mb-6">
       <p className="mb-2 text-[13px] text-muted-foreground">{title}</p>
-      <div className="flex flex-col gap-0.5">{children}</div>
+      <div className="flex flex-col gap-0.5">
+        <Row active={allActive} label="All" count={allCount} onClick={onAll} />
+        {children}
+      </div>
     </div>
   )
 }
@@ -87,7 +102,12 @@ export function FilterSidebar({
       </p>
 
       {conferences.length > 1 && (
-        <Group title="Conference">
+        <Group
+          title="Conference"
+          allActive={filters.confs.size === 0}
+          allCount={total}
+          onAll={() => setFilters({ ...filters, confs: new Set() })}
+        >
           {conferences.map((c) => (
             <Row
               key={c}
@@ -100,7 +120,12 @@ export function FilterSidebar({
         </Group>
       )}
 
-      <Group title="Region">
+      <Group
+        title="Region"
+        allActive={filters.regions.size === 0}
+        allCount={total}
+        onAll={() => setFilters({ ...filters, regions: new Set() })}
+      >
         {(["us", "eu", "asia"] as const).map((r) => (
           <Row
             key={r}
@@ -112,7 +137,12 @@ export function FilterSidebar({
         ))}
       </Group>
 
-      <Group title="Year">
+      <Group
+        title="Year"
+        allActive={filters.years.size === 0}
+        allCount={total}
+        onAll={() => setFilters({ ...filters, years: new Set() })}
+      >
         <div className="max-h-64 overflow-y-auto pr-1 flex flex-col gap-0.5">
           {years
             .filter((y) => y >= oldestIndividualYear)

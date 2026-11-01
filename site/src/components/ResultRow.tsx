@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { confName, type Session } from "@/lib/types"
+import { confShort, type Session } from "@/lib/types"
 
 function Highlight({ text, terms }: { text: string; terms: Set<string> }) {
   if (!text) return null
@@ -34,11 +34,12 @@ export function ResultRow({ s, terms }: { s: Session; terms: Set<string> }) {
     .map((p) => (p.company ? `${p.name} (${p.company})` : p.name))
     .join("; ")
   const long = s.abstract.length > 320
-  // uniform classification badge: {Conference} [{Region}] {Year}
+  // classification badge: {Conference}-{Region}-{Year} (region only where it
+  // is a real distinction, i.e. Black Hat editions)
   const regionTag = s.event.label.match(/^(US|EU|Asia)-/)?.[1]
-  const badge = [confName(s.conference), regionTag, s.event.year > 0 ? s.event.year : null]
+  const badge = [confShort(s.conference), regionTag, s.event.year > 0 ? s.event.year : null]
     .filter(Boolean)
-    .join(" ")
+    .join("-")
 
   return (
     <article className="py-5 border-b border-line">
