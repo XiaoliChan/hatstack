@@ -1,10 +1,9 @@
 name: Run Scrapy
 
+# Auto-trigger disabled during the search-site rebuild (design consensus Q14:
+# legacy pipeline retires to manual-only; bulk download returns as a crawler
+# subcommand). Delete this workflow once the new pipeline ships.
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
