@@ -48,8 +48,10 @@ jobs:
       max-parallel: 10
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
     concurrency:
-      group: crawl-${{ matrix.conf }}
-      cancel-in-progress: true
+      # unique per dispatched run: batched blackhat dispatches (multiple runs
+      # with disjoint --events sets) must run in parallel, not cancel each other
+      group: crawl-${{ matrix.conf }}-${{ github.run_id }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
