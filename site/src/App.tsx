@@ -105,9 +105,14 @@ export default function App() {
           <div className="flex items-center gap-2">
             <a
               href="https://xiaolichan.github.io/"
-              className="inline-flex items-center h-8 px-3 rounded-md border border-line text-[13px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+              title="XiaoliChan's homepage"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-line text-[13px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
             >
-              XiaoliChan
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <path d="M9 22V12h6v10" />
+              </svg>
+              home
             </a>
             <ThemeToggle />
           </div>
