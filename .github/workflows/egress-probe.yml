@@ -1,16 +1,16 @@
 name: Egress Probe
 
-# Phase 0, iteration 4 — un-hijacked in-page fetch.
-# v3 finding: Transcend's airgap.js monkey-patches window.fetch, so page.evaluate
-# fetch() dies client-side. Fix under test: add_init_script stashes the pristine
-# fetch at document-start (before any page script runs), then we call
-# window.__origFetch for every target from the cleared page context.
+# Phase 0, iteration 5 — XHR instead of fetch.
+# v3/v4: window.fetch is unusable in-page (Transcend hijack + deeper blocks).
+# v2 proof: the page's OWN XHR fetched sessions.json 200/574KB.
+# Test A: plain XMLHttpRequest from the cleared page to every target path.
+# Test B (fallback if A dies): second microsite navigation + capture its own XHR.
 
 on:
   workflow_dispatch:
 
 jobs:
-  origfetch-probe:
+  xhr-probe:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-python@v5
@@ -22,7 +22,7 @@ jobs:
           pip install playwright
           playwright install chromium --with-deps
 
-      - name: Stashed-fetch probe
+      - name: XHR probe
         run: |
           python - <<'PY'
           import json, time
@@ -31,27 +31,28 @@ jobs:
           UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
           BASE = "https://www.blackhat.com"
 
-          INIT = """
-          Object.defineProperty(window, '__origFetch', {
-            value: window.fetch.bind(window),
-            writable: false,
-            enumerable: false
-          });
-          """
+          XHR_JS = """(u) => new Promise((resolve, reject) => {
+              try {
+                  const x = new XMLHttpRequest();
+                  x.open('GET', u);
+                  x.withCredentials = true;
+                  x.timeout = 30000;
+                  x.onload = () => resolve({status: x.status, len: x.responseText.length, head: x.responseText.slice(0, 120)});
+                  x.onerror = () => reject(new Error('XHR network error'));
+                  x.ontimeout = () => reject(new Error('XHR timeout'));
+                  x.send();
+              } catch (e) { reject(e); }
+          })"""
 
-          FETCH_JS = """async (u) => {
-              const f = window.__origFetch;
-              if (!f) { return {status: -2, len: 0, head: 'NO_ORIG_FETCH'}; }
-              const r = await f(u, {credentials: 'include'});
-              const t = await r.text();
-              return {status: r.status, len: t.length, head: t.slice(0, 120)};
-          }"""
-
-          FETCH_FULL = """async (u) => {
-              const f = window.__origFetch;
-              const r = await f(u, {credentials: 'include'});
-              return await r.text();
-          }"""
+          XHR_FULL = """(u) => new Promise((resolve, reject) => {
+              const x = new XMLHttpRequest();
+              x.open('GET', u);
+              x.withCredentials = true;
+              x.timeout = 30000;
+              x.onload = () => resolve(x.responseText);
+              x.onerror = () => reject(new Error('err'));
+              x.send();
+          })"""
 
           def clear_until_ready(page, url, max_tries=4):
               for i in range(max_tries):
@@ -68,16 +69,16 @@ jobs:
                   time.sleep(12)
               return False
 
-          def ofetch(page, label, url, pause=12):
+          def xhr(page, label, url, pause=12):
               print("-" * 60)
-              print(f"FETCH [{label}]: {url}")
+              print(f"XHR [{label}]: {url}")
               try:
-                  res = page.evaluate(FETCH_JS, url)
+                  res = page.evaluate(XHR_JS, url)
                   print(f"  STATUS {res['status']} | len {res['len']}")
                   print(f"  HEAD {res['head'][:110]!r}")
                   return res
               except Exception as e:
-                  print("  EVALUATE ERROR:", repr(e)[:200])
+                  print("  XHR ERROR:", repr(e)[:200])
                   return {"status": -1, "len": 0, "head": ""}
               finally:
                   time.sleep(pause)
@@ -85,54 +86,71 @@ jobs:
           with sync_playwright() as p:
               browser = p.chromium.launch(args=["--no-sandbox"])
               ctx = browser.new_context(user_agent=UA)
-              ctx.add_init_script(INIT)
               page = ctx.new_page()
 
               print("=" * 60)
-              print("STEP 1: clear challenge on us-24 schedule page")
+              print("TEST A: clear on us-24, then XHR everything")
               ok = clear_until_ready(page, BASE + "/us-24/briefings/schedule/index.html")
               print("CLEARED:", ok)
-              if not ok:
-                  print("FATAL: could not clear challenge")
-                  browser.close()
-                  raise SystemExit(0)
+              if ok:
+                  time.sleep(15)
+                  targets = [
+                      ("sessions us-24 control",  "/us-24/briefings/schedule/sessions.json"),
+                      ("sessions usa/2025",       "/archive/usa/2025/briefings/schedule/sessions.json"),
+                      ("sessions asia/2024",      "/archive/asia/2024/briefings/schedule/sessions.json"),
+                      ("sessions europe/2023",    "/archive/europe/2023/briefings/schedule/sessions.json"),
+                      ("sessions us-26 upcoming", "/us-26/briefings/schedule/sessions.json"),
+                      ("legacy static us-16",     "/us-16/briefings.html"),
+                      ("archives inventory",      "/html/archives.html"),
+                  ]
+                  results = {}
+                  for label, path in targets:
+                      results[label] = xhr(page, label, BASE + path)
 
-              time.sleep(15)
+                  print("=" * 60)
+                  print("ITEM COUNTS for 200-OK sessions.json:")
+                  for label, path in targets:
+                      if "sessions" not in path:
+                          continue
+                      r = results.get(label, {})
+                      if r.get("status") == 200 and r.get("len", 0) > 1000:
+                          try:
+                              txt = page.evaluate(XHR_FULL, BASE + path)
+                              data = json.loads(txt)
+                              n = len(data) if isinstance(data, list) else len(data.get("sessions", data))
+                              print(f"  {label}: JSON_OK items={n}")
+                          except Exception as e:
+                              print(f"  {label}: parse error {repr(e)[:120]}")
+                          time.sleep(8)
 
               print("=" * 60)
-              print("STEP 2: __origFetch everything (paced)")
-              targets = [
-                  ("sessions us-24 control",   "/us-24/briefings/schedule/sessions.json"),
-                  ("sessions usa/2025",        "/archive/usa/2025/briefings/schedule/sessions.json"),
-                  ("sessions asia/2024",       "/archive/asia/2024/briefings/schedule/sessions.json"),
-                  ("sessions europe/2023",     "/archive/europe/2023/briefings/schedule/sessions.json"),
-                  ("sessions us-26 upcoming",  "/us-26/briefings/schedule/sessions.json"),
-                  ("legacy static us-16",      "/us-16/briefings.html"),
-                  ("archives inventory",       "/html/archives.html"),
-              ]
-              results = {}
-              for label, path in targets:
-                  results[label] = ofetch(page, label, BASE + path)
-
-              print("=" * 60)
-              print("STEP 3: item counts where sessions.json returned 200")
-              for label, path in targets:
-                  if "sessions" not in path:
-                      continue
-                  r = results.get(label, {})
-                  if r.get("status") == 200 and r.get("len", 0) > 1000:
+              print("TEST B: second microsite nav + capture its own XHR (eu-24)")
+              captured = []
+              def on_response(resp):
+                  try:
+                      if "sessions.json" in resp.url:
+                          captured.append(resp)
+                  except Exception:
+                      pass
+              page.on("response", on_response)
+              ok2 = clear_until_ready(page, BASE + "/eu-24/briefings/schedule/index.html")
+              print("TEST_B_CLEARED:", ok2)
+              if ok2:
+                  time.sleep(10)
+                  li = page.locator("ul#cal_content_Day li").count()
+                  print("TEST_B_RENDERED_LI:", li)
+                  print("TEST_B_CAPTURED:", len(captured))
+                  for r in captured:
                       try:
-                          txt = page.evaluate(FETCH_FULL, BASE + path)
-                          data = json.loads(txt)
-                          n = len(data) if isinstance(data, list) else len(data.get("sessions", data))
-                          first = ""
-                          if isinstance(data, list) and data:
-                              s = data[0]
-                              first = str({k: s.get(k) for k in ("id", "title") if isinstance(s, dict)})[:160]
-                          print(f"  {label}: JSON_OK items={n} first={first!r}")
+                          b = r.body()
+                          print(f"  CAPTURED {r.url[-70:]} status={r.status} bytes={len(b)}")
+                          try:
+                              d = json.loads(b)
+                              print("  CAPTURED_JSON_OK items:", len(d) if isinstance(d, list) else -1)
+                          except Exception:
+                              print("  CAPTURED_JSON: not json")
                       except Exception as e:
-                          print(f"  {label}: parse error {repr(e)[:150]}")
-                      time.sleep(10)
+                          print("  capture read err:", repr(e)[:120])
 
               browser.close()
           PY
