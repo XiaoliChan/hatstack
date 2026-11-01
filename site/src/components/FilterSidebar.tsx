@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils"
-import { confName, type ConferenceInfo } from "@/lib/types"
+import { type ConferenceInfo } from "@/lib/types"
 
 export interface Filters {
   confs: Set<string>
