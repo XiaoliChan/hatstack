@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import random
 import time
 from pathlib import Path
 
@@ -32,46 +33,70 @@ def _s() -> requests.Session:
 
 
 def _sleep():
-    time.sleep(1.5)
+    time.sleep(random.uniform(2.5, 4.0))
 
 
 def cdx_newest(url: str, limit: int = 3) -> str | None:
-    """Newest timestamp of a 200 capture for url, or None."""
-    try:
-        r = _s().get(
-            CDX,
-            params={
-                "url": url,
-                "output": "json",
-                "filter": "statuscode:200",
-                "collapse": "digest",
-                "limit": f"-{limit}",
-            },
-            timeout=30,
-        )
-        _sleep()
-        if r.status_code != 200:
-            return None
-        rows = r.json()
-        if not isinstance(rows, list) or len(rows) < 2:
-            return None
-        return rows[-1][1]  # last row = newest
-    except Exception:
-        return None
+    """Newest timestamp of a 200 capture for url, or None. CDX is rate-limited
+    from datacenter IPs — treat as best-effort fallback only."""
+    for attempt in range(3):
+        try:
+            r = _s().get(
+                CDX,
+                params={
+                    "url": url,
+                    "output": "json",
+                    "filter": "statuscode:200",
+                    "collapse": "digest",
+                    "limit": f"-{limit}",
+                },
+                timeout=30,
+            )
+            _sleep()
+            if r.status_code in (429, 503):
+                time.sleep(5 * (attempt + 1))
+                continue
+            if r.status_code != 200:
+                return None
+            rows = r.json()
+            if not isinstance(rows, list) or len(rows) < 2:
+                return None
+            return rows[-1][1]  # last row = newest
+        except Exception:
+            time.sleep(3)
+    return None
 
 
-def wayback_get(url: str, ts: str) -> bytes | None:
-    try:
-        r = _s().get(f"{WEB}/{ts}id_/{url}", timeout=60)
-        _sleep()
-        if r.status_code != 200:
-            return None
-        body = r.content
-        if body[:2] == b"\x1f\x8b":  # gzip'd original bytes
-            body = gzip.decompress(body)
-        return body
-    except Exception:
-        return None
+NOW_TS = "20261101000000"
+
+
+def wayback_get(url: str, ts: str = NOW_TS, log=None) -> bytes | None:
+    """Fetch original bytes. Direct now-timestamp fetch redirects to the
+    closest-to-now capture (= latest); one request, no CDX needed.
+    Retries with backoff on wayback's aggressive 429/503 rate limits."""
+    for attempt in range(4):
+        try:
+            r = _s().get(f"{WEB}/{ts}id_/{url}", timeout=60)
+            _sleep()
+            if r.status_code in (429, 503):
+                wait = 8 * (attempt + 1) + random.uniform(0, 4)
+                if log:
+                    log(f"HTTP {r.status_code} (rate limited), backoff {wait:.0f}s")
+                time.sleep(wait)
+                continue
+            if r.status_code != 200:
+                if log:
+                    log(f"HTTP {r.status_code}: {url}")
+                return None
+            body = r.content
+            if body[:2] == b"\x1f\x8b":  # gzip'd original bytes
+                body = gzip.decompress(body)
+            return body if len(body) > 200 else None
+        except Exception as e:
+            if log:
+                log(f"fetch error {e!r}")
+            time.sleep(5)
+    return None
 
 
 def json_candidates(event: dict) -> list[str]:
@@ -85,19 +110,16 @@ def json_candidates(event: dict) -> list[str]:
 
 
 def page_candidates(event: dict) -> list[str]:
-    """Static page URL variants for a legacy event."""
+    """Static page URL variants for a legacy event. JSON-era schedule shells
+    are excluded — their content arrives via XHR, useless as static HTML."""
     region, year = event["region"], event["year"]
     yy = str(year)[2:]
-    urls = []
     if year < 2013:
-        urls.extend(event.get("urls", []))  # curated pre-2013 paths
-        return urls
-    urls = [
+        return list(event.get("urls", []))  # curated pre-2013 paths
+    return [
         f"https://www.blackhat.com/{region}-{yy}/briefings.html",
         f"https://www.blackhat.com/{region}-{yy}/archives.html",
-        f"https://www.blackhat.com/{region}-{yy}/briefings/schedule/index.html",
     ]
-    return urls
 
 
 def wayback_event(event: dict) -> dict:
@@ -113,15 +135,15 @@ def wayback_event(event: dict) -> dict:
 
     try_orders = json_candidates(event) if json_era else []
     for url in try_orders:
-        ts = cdx_newest(url)
-        if not ts:
-            say(f"cdx miss: {url}")
-            continue
-        body = wayback_get(url, ts)
+        body = wayback_get(url, log=say)  # direct now-ts fetch (latest capture)
         if not body:
-            say(f"cdx {ts} fetch failed: {url}")
+            ts = cdx_newest(url)
+            if ts:
+                body = wayback_get(url, ts, log=say)
+        if not body:
+            say(f"no capture: {url}")
             continue
-        say(f"cdx {ts} {len(body)}B: {url}")
+        say(f"got {len(body)}B: {url}")
         try:
             data = json.loads(body)
         except Exception as e:
@@ -142,16 +164,16 @@ def wayback_event(event: dict) -> dict:
                      "title": f"wayback {ts}", "trace": trace},
         }
     for url in page_candidates(event):
-        ts = cdx_newest(url)
-        if not ts:
-            say(f"cdx miss: {url}")
-            continue
-        body = wayback_get(url, ts)
+        body = wayback_get(url, log=say)
         if not body:
-            say(f"cdx {ts} fetch failed: {url}")
+            ts = cdx_newest(url)
+            if ts:
+                body = wayback_get(url, ts, log=say)
+        if not body:
+            say(f"no capture: {url}")
             continue
         html = body.decode("utf-8", "replace")
-        say(f"cdx {ts} {len(html)}B page: {url} (pdfs: {html.lower().count('.pdf')})")
+        say(f"got {len(html)}B page: {url} (pdfs: {html.lower().count('.pdf')})")
         if ".pdf" not in html.lower():
             continue
         return {
@@ -170,10 +192,11 @@ def wayback_event(event: dict) -> dict:
 
 def wayback_inventory() -> str | None:
     """archives.html original bytes via wayback, or None."""
-    ts = cdx_newest(ARCHIVES_ORIGINAL)
-    if not ts:
-        return None
-    body = wayback_get(ARCHIVES_ORIGINAL, ts)
+    body = wayback_get(ARCHIVES_ORIGINAL)
+    if not body:
+        ts = cdx_newest(ARCHIVES_ORIGINAL)
+        if ts:
+            body = wayback_get(ARCHIVES_ORIGINAL, ts)
     if not body:
         return None
     return body.decode("utf-8", "replace")
