@@ -187,17 +187,15 @@ def write_outputs(dataset: dict, per_conf: dict[str, dict[str, dict]], out_dir: 
     ds_path = out_dir / "dataset.json"
     ds_path.write_text(json.dumps(dataset, ensure_ascii=False), encoding="utf-8")
     report_md, report_json = build_report(per_conf, dataset)
-    (out_dir / "report.json").write_text(
-        json.dumps(report_json, ensure_ascii=False, indent=1), encoding="utf-8"
-    )
-    (out_dir / "report.md").write_text(report_md, encoding="utf-8")
+    report_dir = out_dir / "report"
+    report_dir.mkdir(exist_ok=True)
+    # lightweight overview only — details live in per-conference report/*.md
+    (report_dir / "summary.md").write_text(report_md, encoding="utf-8")
 
     # per-conference split files (mirrors the UI structure: manifest entry +
     # editions + that conference's sessions); site keeps the aggregate file
     by_dir = out_dir / "by-conference"
     by_dir.mkdir(exist_ok=True)
-    report_dir = out_dir / "report"
-    report_dir.mkdir(exist_ok=True)
     conf_meta = {c["id"]: c for c in dataset.get("conferences", [])}
     for conf_id in conf_meta:
         sessions = [s for s in dataset["sessions"] if s.get("conference", "blackhat") == conf_id]
@@ -218,4 +216,4 @@ def write_outputs(dataset: dict, per_conf: dict[str, dict[str, dict]], out_dir: 
             + "\n".join(rows) + "\n",
             encoding="utf-8",
         )
-    return {"dataset": ds_path, "report_md": out_dir / "report.md", "report": out_dir / "report.json"}
+    return {"dataset": ds_path, "report_md": report_dir / "summary.md"}
