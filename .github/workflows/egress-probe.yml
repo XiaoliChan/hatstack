@@ -1,16 +1,16 @@
 name: Egress Probe
 
-# Phase 0, iteration 3 — the decisive test.
-# Hypothesis: pass Cloudflare's managed challenge ONCE on a schedule page, then
-# pull ALL data via same-origin fetch() from inside the cleared page context
-# (Chromium TLS stack + cf_clearance + polite pacing). If this works, the live
-# crawler architecture is: 1 page load + N in-page fetches.
+# Phase 0, iteration 4 — un-hijacked in-page fetch.
+# v3 finding: Transcend's airgap.js monkey-patches window.fetch, so page.evaluate
+# fetch() dies client-side. Fix under test: add_init_script stashes the pristine
+# fetch at document-start (before any page script runs), then we call
+# window.__origFetch for every target from the cleared page context.
 
 on:
   workflow_dispatch:
 
 jobs:
-  inpage-fetch-probe:
+  origfetch-probe:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-python@v5
@@ -22,7 +22,7 @@ jobs:
           pip install playwright
           playwright install chromium --with-deps
 
-      - name: Cleared-context in-page fetch probe
+      - name: Stashed-fetch probe
         run: |
           python - <<'PY'
           import json, time
@@ -31,10 +31,26 @@ jobs:
           UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
           BASE = "https://www.blackhat.com"
 
+          INIT = """
+          Object.defineProperty(window, '__origFetch', {
+            value: window.fetch.bind(window),
+            writable: false,
+            enumerable: false
+          });
+          """
+
           FETCH_JS = """async (u) => {
-              const r = await fetch(u, {credentials: 'include'});
+              const f = window.__origFetch;
+              if (!f) { return {status: -2, len: 0, head: 'NO_ORIG_FETCH'}; }
+              const r = await f(u, {credentials: 'include'});
               const t = await r.text();
               return {status: r.status, len: t.length, head: t.slice(0, 120)};
+          }"""
+
+          FETCH_FULL = """async (u) => {
+              const f = window.__origFetch;
+              const r = await f(u, {credentials: 'include'});
+              return await r.text();
           }"""
 
           def clear_until_ready(page, url, max_tries=4):
@@ -52,7 +68,7 @@ jobs:
                   time.sleep(12)
               return False
 
-          def page_fetch(page, label, url, pause=15):
+          def ofetch(page, label, url, pause=12):
               print("-" * 60)
               print(f"FETCH [{label}]: {url}")
               try:
@@ -69,6 +85,7 @@ jobs:
           with sync_playwright() as p:
               browser = p.chromium.launch(args=["--no-sandbox"])
               ctx = browser.new_context(user_agent=UA)
+              ctx.add_init_script(INIT)
               page = ctx.new_page()
 
               print("=" * 60)
@@ -76,61 +93,46 @@ jobs:
               ok = clear_until_ready(page, BASE + "/us-24/briefings/schedule/index.html")
               print("CLEARED:", ok)
               if not ok:
-                  print("FATAL: could not clear challenge; aborting fetch tests")
+                  print("FATAL: could not clear challenge")
                   browser.close()
                   raise SystemExit(0)
 
-              print("waiting 20s before in-page fetches...")
-              time.sleep(20)
+              time.sleep(15)
 
               print("=" * 60)
-              print("STEP 2: in-page same-origin fetches (paced 15s)")
-
+              print("STEP 2: __origFetch everything (paced)")
               targets = [
-                  ("sessions us-24 microsite", "/us-24/briefings/schedule/sessions.json"),
-                  ("sessions usa/2025 newpath", "/archive/usa/2025/briefings/schedule/sessions.json"),
-                  ("sessions asia/2024 newpath", "/archive/asia/2024/briefings/schedule/sessions.json"),
-                  ("sessions europe/2023 newpath", "/archive/europe/2023/briefings/schedule/sessions.json"),
-                  ("legacy static us-16", "/us-16/briefings.html"),
-                  ("archives inventory", "/html/archives.html"),
+                  ("sessions us-24 control",   "/us-24/briefings/schedule/sessions.json"),
+                  ("sessions usa/2025",        "/archive/usa/2025/briefings/schedule/sessions.json"),
+                  ("sessions asia/2024",       "/archive/asia/2024/briefings/schedule/sessions.json"),
+                  ("sessions europe/2023",     "/archive/europe/2023/briefings/schedule/sessions.json"),
+                  ("sessions us-26 upcoming",  "/us-26/briefings/schedule/sessions.json"),
+                  ("legacy static us-16",      "/us-16/briefings.html"),
+                  ("archives inventory",       "/html/archives.html"),
               ]
               results = {}
               for label, path in targets:
-                  results[label] = page_fetch(page, label, BASE + path)
+                  results[label] = ofetch(page, label, BASE + path)
 
               print("=" * 60)
-              print("STEP 3: JSON item counts for fetched sessions.json")
-              for label in [t[0] for t in targets if "sessions" in t[1]]:
+              print("STEP 3: item counts where sessions.json returned 200")
+              for label, path in targets:
+                  if "sessions" not in path:
+                      continue
                   r = results.get(label, {})
                   if r.get("status") == 200 and r.get("len", 0) > 1000:
                       try:
-                          res2 = page.evaluate(
-                              "async (u) => { const r = await fetch(u, {credentials:'include'}); const t = await r.text(); return t; }",
-                              BASE + [t[1] for t in targets if t[0] == label][0],
-                          )
-                          data = json.loads(res2)
+                          txt = page.evaluate(FETCH_FULL, BASE + path)
+                          data = json.loads(txt)
                           n = len(data) if isinstance(data, list) else len(data.get("sessions", data))
-                          sample = ""
+                          first = ""
                           if isinstance(data, list) and data:
-                              sample = str(data[0])[:150]
-                          print(f"  {label}: JSON_OK items={n} sample={sample!r}")
+                              s = data[0]
+                              first = str({k: s.get(k) for k in ("id", "title") if isinstance(s, dict)})[:160]
+                          print(f"  {label}: JSON_OK items={n} first={first!r}")
                       except Exception as e:
-                          print(f"  {label}: re-fetch/parse error {repr(e)[:150]}")
+                          print(f"  {label}: parse error {repr(e)[:150]}")
                       time.sleep(10)
-
-              print("=" * 60)
-              print("STEP 4: paced second navigation (asia/2024 page, 30s wait)")
-              time.sleep(30)
-              try:
-                  resp = page.goto(BASE + "/archive/asia/2024/briefings/schedule/index.html",
-                                   timeout=60000, wait_until="domcontentloaded")
-                  time.sleep(8)
-                  print("  NAV2_STATUS:", resp.status if resp else None,
-                        "TITLE:", page.title()[:60])
-                  li = page.locator("ul#cal_content_Day li").count()
-                  print("  NAV2_RENDERED_LI:", li)
-              except Exception as e:
-                  print("  NAV2 ERROR:", repr(e)[:200])
 
               browser.close()
           PY
