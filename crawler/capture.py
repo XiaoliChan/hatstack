@@ -159,6 +159,18 @@ def _capture_json(page, url: str, expected_year: int, log=None) -> dict | None:
             page.remove_listener("response", on_response)
         except Exception:
             pass
+    # some years don't fetch sessions.json via XHR but the page still renders
+    # the schedule from inline data — harvest the rendered DOM instead
+    if rendered > 0:
+        if log:
+            log(f"falling back to rendered DOM ({rendered} rows)")
+        return {
+            "status": "ok",
+            "kind": "rendered",
+            "html": page.content(),
+            "rendered_li": rendered,
+            "year": expected_year,
+        }
     return None
 
 

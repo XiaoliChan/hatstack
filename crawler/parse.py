@@ -227,3 +227,65 @@ def parse_legacy_html(event: dict, html: str) -> list[dict]:
                 }
             )
     return records
+
+
+def parse_rendered_schedule(event: dict, html: str) -> list[dict]:
+    """Rendered Black Hat schedule DOM (no-XHR years): li rows under
+    ul#cal_content_Day carry title/speakers; detail modals (when present)
+    carry abstract + material links."""
+    label = event_label(event["region"], event["year"])
+    soup = BeautifulSoup(html, "lxml")
+    records = []
+    seen: set[str] = set()
+    for li in soup.select("ul#cal_content_Day li"):
+        a = li.find("a", attrs={"href": re.compile("#")})
+        if not a:
+            continue
+        title_el = a.find(["h3", "h4", "strong", "b"]) or a
+        title = title_el.get_text(" ", strip=True)
+        if not title or len(title) < 6:
+            continue
+        key = title.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        # speakers: the rest of the row text minus the title
+        row_text = li.get_text(" ", strip=True).replace(title, " ", 1)
+        row_text = re.sub(r"\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}", " ", row_text)
+        speakers = [
+            {"name": s.strip(), "company": None, "role": None}
+            for s in re.split(r"\s{2,}|,|·", row_text)
+            if 3 < len(s.strip()) < 40 and not re.search(r"\d", s)
+        ][:5]
+        # detail modal for this session (id-matched) if rendered
+        files = {"slides": None, "whitepaper": None, "tool": None}
+        abstract = ""
+        anchor = (a.get("href") or "").lstrip("#")
+        detail = soup.find(id=re.compile(re.escape(anchor))) if anchor else None
+        scope = detail if detail else li
+        for link in scope.find_all("a", href=True):
+            href = link["href"]
+            if href.lower().endswith(".pdf"):
+                if "-wp" in href.rsplit("/", 1)[-1] and not files["whitepaper"]:
+                    files["whitepaper"] = _norm_file_url(href)
+                elif not files["slides"]:
+                    files["slides"] = _norm_file_url(href)
+            elif "i.blackhat.com" in href and not files["slides"]:
+                files["slides"] = _norm_file_url(href)
+        desc = scope.find(class_=re.compile("desc|abstract|session-detail", re.I))
+        if desc:
+            abstract = desc.get_text(" ", strip=True)[:4000]
+        records.append(
+            {
+                "id": f"{label.lower().replace('-', '')}-{re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')[:60]}",
+                "event": {"region": event["region"], "year": event["year"], "label": label},
+                "title": title,
+                "speakers": speakers,
+                "abstract": abstract,
+                "track": None,
+                "files": files,
+                "video_url": None,
+                "source_url": event.get("source_url"),
+            }
+        )
+    return records

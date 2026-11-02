@@ -25,6 +25,13 @@ def build_records(event_key: str, capture: dict, conference: str = "blackhat") -
         for r in capture["records"]:
             r["conference"] = conference
         return capture["records"]
+    if capture.get("kind") == "rendered":  # live page rendered without XHR
+        from .parse import parse_rendered_schedule
+
+        records = parse_rendered_schedule(event, capture.get("html", ""))
+        for r in records:
+            r["conference"] = conference
+        return records
     region, year = event_key.split("-")[0], int(event_key.split("-")[1])
     event = {"region": region, "year": year, "source_url": capture.get("meta", {}).get("url")}
     if capture.get("kind") == "json":
