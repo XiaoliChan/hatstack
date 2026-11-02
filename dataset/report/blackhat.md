@@ -9,12 +9,12 @@
 | us-2025 | ok | json | 110 | li=None | OK json (118 sessions) from 20251001214040 |
 | asia-2024 | ok | json | 43 | li=None | OK json (51 sessions) from 20240902150952 |
 | eu-2024 | ok | json | 47 | li=None | OK json (55 sessions) from 20250326102405 |
-| us-2024 | failed | - | 0 |  | all attempts exhausted |
+| us-2024 | ok | json | 121 | li=None | OK json (129 sessions) from 20250825172324 |
 | asia-2023 | ok | json | 44 | li=None | OK json (52 sessions) from 20250905091420 |
 | eu-2023 | failed | - | 0 |  | all attempts exhausted |
 | us-2023 | ok | json | 109 | li=None | OK json (117 sessions) from 20241209095320 |
 | asia-2022 | failed | - | 0 |  | all attempts exhausted |
-| eu-2022 | failed | - | 0 |  | all attempts exhausted |
+| eu-2022 | ok | json | 44 | li=None | OK json (52 sessions) from 20250526102859 |
 | us-2022 | ok | json | 101 | li=None | OK json (109 sessions) from 20250905112833 |
 | asia-2021 | ok | json | 40 | li=None | OK json (40 sessions) from 20251103175601 |
 | eu-2021 | ok | json | 72 | li=None | OK json (72 sessions) from 20260213092619 |
@@ -24,8 +24,8 @@
 | us-2020 | failed | - | 0 |  | all attempts exhausted |
 | asia-2019 | failed | - | 0 |  | all attempts exhausted |
 | eu-2019 | ok | json | 46 | li=None | OK json (61 sessions) from 20220924074936 |
-| us-2019 | failed | - | 0 |  | all attempts exhausted |
-| asia-2018 | failed | - | 0 |  | all attempts exhausted |
+| us-2019 | ok | json | 124 | li=None | OK json (124 sessions) from 20250203150129 |
+| asia-2018 | ok | legacy | 30 |  | got 117796B page via web.archive.org: https://www.blackhat.com/asia-18/briefings.html (pdfs: 40) |
 | eu-2018 | failed | - | 0 |  | all attempts exhausted |
 | us-2018 | failed | - | 0 |  | all attempts exhausted |
 | asia-2017 | ok | legacy | 28 |  | legacy page 119511B, pdf refs 41 |
