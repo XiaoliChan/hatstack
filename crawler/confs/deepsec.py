@@ -62,8 +62,16 @@ def collect(ctx: dict) -> dict[str, dict]:
     top = get_listing("", log=say)
     trace.append(f"/docs/: {len(top)} entries -> {top[:12]}")
     say(trace[-1])
-    # candidate dirs that hold per-year material
-    interesting = [e for e in top if re.search(r"(talk|slide|presentation|20\d\d)", e, re.I)]
+    # recurse one level into every non-media directory (top level also has
+    # loose PDFs)
+    interesting = [e for e in top
+                   if e.endswith("/") and e.split("/")[0].upper() not in
+                   ("ALBUM", "AUDIO", "BANNER", "VIDEO", "VIDEOS", "IMAGES", "IMG")]
+    for name in top:
+        if name.lower().endswith(".pdf") and "/" not in name:
+            interesting.append(name)  # handled below as loose file marker
+    interesting = [e for e in interesting if e.endswith("/")]
+    loose_pdfs = [e for e in top if e.lower().endswith(".pdf")]
     for d in interesting:
         sub = get_listing(d, log=say)
         trace.append(f"{d}: {len(sub)} entries")

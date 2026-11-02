@@ -10,11 +10,14 @@ def curl_get(url: str, timeout: int = 60) -> tuple[int, str]:
         ["curl", "-4", "-sSL", "--max-time", str(timeout),
          "-A", "Mozilla/5.0 (X11; Linux x86_64) Chrome/130.0.0.0 Safari/537.36",
          "-w", "\n%{http_code}", url],
-        capture_output=True, text=True, timeout=timeout + 30,
+        capture_output=True, timeout=timeout + 30,
     )
-    if p.returncode != 0 or "\n" not in p.stdout:
+    # decode manually: CI runners use a POSIX locale where text=True explodes
+    # on non-ASCII bytes (speaker names) — this killed SEC-T and DeepSec runs
+    stdout = p.stdout.decode("utf-8", errors="replace")
+    if p.returncode != 0 or "\n" not in stdout:
         return 0, ""
-    body, _, code = p.stdout.rpartition("\n")
+    body, _, code = stdout.rpartition("\n")
     try:
         return int(code), body
     except ValueError:
