@@ -44,7 +44,7 @@ jobs:
 
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 300
     needs: setup
     strategy:
       fail-fast: false
