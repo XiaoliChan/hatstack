@@ -1,0 +1,72 @@
+name: Recon
+
+# Structure recon for remaining conferences: one job per target, single GETs
+# (or one Playwright render for JS sites), dumps first bytes + markers as an
+# artifact so adapters get written against real structure, not guesses.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        include:
+          - name: sect-pretalx
+            urls: "https://event.sec-t.org/sec-t-2026/schedule/export/schedule.json|https://event.sec-t.org/sec-t-2026/schedule/widget/v1.json|https://event.sec-t.org/sec-t-2026/api/schedule/"
+          - name: troopers
+            urls: "https://troopers.de/sitemap.xml|https://schedule.troopers.de/|https://troopers.de/en/talks/"
+          - name: nullcon
+            urls: "https://nullcon.net/archive|https://nullcon.net/archives"
+          - name: hacklu
+            urls: "https://2025.hack.lu/schedule/schedule.xml|https://frab.hack.lu/en/2025/schedule/|https://pretalx.hack.lu/hacklu-2025/schedule.json"
+          - name: vb
+            urls: "https://vbconference.com/presentations|https://www.virusbulletin.com/conference_slides"
+          - name: ekoparty
+            urls: "https://www.ekoparty.org/archive|https://www.ekoparty.org/en/archive/"
+          - name: codeblue
+            urls: "https://codeblue.jp/en/program/|https://codeblue.jp/archives/"
+          - name: con44
+            urls: "https://www.44con.com/44con-2025/|https://www.44con.com/past-events/"
+          - name: deepsec
+            urls: "https://www.deepsec.net/docs/|https://deepsec.net/docs/"
+          - name: h2hc
+            urls: "https://www.h2hc.com.br/papers.html|https://h2hc.com.br/archives/"
+          - name: zer0con
+            urls: "https://zer0con.org/archive|https://zer0con.org/past/"
+          - name: mosec
+            urls: "https://mosec.org/|https://mosec.org/2019/|https://mosec.org/2016/"
+    steps:
+      - name: Probe ${{ matrix.name }}
+        run: |
+          mkdir -p /tmp/recon
+          IFS='|' read -ra URLS <<< "${{ matrix.urls }}"
+          i=0
+          for u in "${URLS[@]}"; do
+            i=$((i+1))
+            out="/tmp/recon/${{ matrix.name }}-$i.txt"
+            code=$(curl -4 -sL --max-time 30 -A "Mozilla/5.0 (X11; Linux x86_64) Chrome/130.0.0.0" \
+              -o "$out.body" -w "%{http_code}" "$u" || echo ERR)
+            {
+              echo "URL: $u"
+              echo "CODE: $code"
+              echo "SIZE: $(wc -c < "$out.body" 2>/dev/null)"
+              echo "--- markers ---"
+              grep -oiE '(\.pdf|\.mp4|schedule\.json|pretalx|frab|__NEXT_DATA__|api/|talk|speaker|slide)' "$out.body" 2>/dev/null | sort | uniq -c | sort -rn | head -10
+              echo "--- first 800 bytes ---"
+              head -c 800 "$out.body" 2>/dev/null
+            } > "$out"
+            rm -f "$out.body"
+            sleep 2
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: recon-${{ matrix.name }}
+          path: /tmp/recon/
