@@ -70,8 +70,6 @@ export const CONF_NAMES: Record<string, string> = {
   kcon: "KCon",
   redteamvillage: "Red Team Village",
   x33fcon: "x33fcon",
-  pretalx: "SEC-T",
-  deepsec: "DeepSec",
 }
 
 export function confName(id?: string): string {
@@ -95,8 +93,6 @@ const CONF_SHORT: Record<string, string> = {
   kcon: "KCon",
   redteamvillage: "RTV",
   x33fcon: "x33fcon",
-  pretalx: "SEC-T",
-  deepsec: "DeepSec",
 }
 
 export interface DatasetMeta {

@@ -1,11 +1,11 @@
 # Crawl completeness report
 
-- dataset version: 2026-11-02T07:13:07Z
-- total sessions: 11939
-- sessions with slides: 4164
-- sessions with whitepaper: 532
-- sessions with tool: 71
-- sessions with abstract: 8358
+- dataset version: 2026-11-02T09:28:08Z
+- total sessions: 11895
+- sessions with slides: 4210
+- sessions with whitepaper: 587
+- sessions with tool: 72
+- sessions with abstract: 8382
 
 ## blackhat
 
@@ -22,7 +22,7 @@
 | asia-2023 | ok | json | 44 | li=None | OK json (52 sessions) from 20250905091420 |
 | eu-2023 | failed | - | 0 |  | all attempts exhausted |
 | us-2023 | ok | json | 109 | li=None | OK json (117 sessions) from 20241209095320 |
-| asia-2022 | failed | - | 0 |  | all attempts exhausted |
+| asia-2022 | ok | json | 34 | li=None | OK json (34 sessions) from 20220720113646 |
 | eu-2022 | ok | json | 44 | li=None | OK json (52 sessions) from 20250526102859 |
 | us-2022 | ok | json | 101 | li=None | OK json (109 sessions) from 20250905112833 |
 | asia-2021 | ok | json | 40 | li=None | OK json (40 sessions) from 20251103175601 |
@@ -48,7 +48,7 @@
 | us-2015 | ok | legacy | 92 |  | legacy page 296839B, pdf refs 146 |
 | asia-2014 | failed | - | 0 |  | all attempts exhausted |
 | eu-2014 | ok | legacy | 34 |  | got 116987B page via web.archive.org: https://www.blackhat.com/eu-14/briefings.html (pdfs: 56) |
-| us-2014 | failed | - | 0 |  | all attempts exhausted |
+| us-2014 | ok | legacy | 90 |  | got 261052B page via web.archive.org: https://www.blackhat.com/us-14/archives.html (pdfs: 137) |
 | asia-2013 | failed | - | 0 |  | all attempts exhausted |
 | eu-2013 | ok | legacy | 29 |  | legacy page 103110B, pdf refs 51 |
 | us-2013 | failed | - | 0 |  | all attempts exhausted |
@@ -56,7 +56,7 @@
 | us-2012 | ok | legacy | 73 |  | got 237713B page via web.archive.org: https://www.blackhat.com/html/bh-us-12/bh-us-12-archives.html (pdfs: 147) |
 | eu-2011 | ok | legacy | 20 |  | legacy page 56509B, pdf refs 24 |
 | us-2011 | ok | legacy | 59 |  | legacy page 174374B, pdf refs 108 |
-| eu-2010 | failed | - | 0 |  | no usable wayback capture |
+| eu-2010 | failed | - | 0 |  | all attempts exhausted |
 | us-2010 | ok | legacy | 75 |  | got 199104B page via web.archive.org: https://www.blackhat.com/html/bh-us-10/bh-us-10-archives.html (pdfs: 113) |
 | eu-2009 | failed | - | 0 |  | no usable wayback capture |
 | us-2009 | failed | - | 0 |  | no usable wayback capture |
@@ -316,24 +316,4 @@
 |---|---|---|---|---|
 | all | ok | records | 109 |  | 4 editions, 109 talks total |
 
-## pretalx
-
-| event | status | kind | sessions | note |
-|---|---|---|---|---|
-| sec-t-2018 | skipped | - | 0 |  | no schedule json for sec-t-2018 |
-| sec-t-2019 | skipped | - | 0 |  | no schedule json for sec-t-2019 |
-| sec-t-2020 | skipped | - | 0 |  | no schedule json for sec-t-2020 |
-| sec-t-2021 | skipped | - | 0 |  | no schedule json for sec-t-2021 |
-| sec-t-2022 | skipped | - | 0 |  | no schedule json for sec-t-2022 |
-| sec-t-2023 | skipped | - | 0 |  | no schedule json for sec-t-2023 |
-| sec-t-2024 | ok | records | 29 |  |
-| sec-t-2025 | ok | records | 37 |  |
-| sec-t-2026 | ok | records | 34 |  |
-
-## deepsec
-
-| event | status | kind | sessions | note |
-|---|---|---|---|---|
-| all | ok | records | 70 |  | t/: 20 entries |
-
-failed events: blackhat/eu-2026, blackhat/us-2026, blackhat/asia-2025, blackhat/eu-2023, blackhat/asia-2022, blackhat/asia-2020, blackhat/us-2020, blackhat/asia-2019, blackhat/eu-2018, blackhat/us-2018, blackhat/asia-2014, blackhat/us-2014, blackhat/asia-2013, blackhat/us-2013, blackhat/eu-2010, blackhat/eu-2009, blackhat/us-2009, blackhat/asia-2008, blackhat/eu-2008, blackhat/us-2008, blackhat/asia-2007, blackhat/eu-2007, blackhat/asia-2006, blackhat/eu-2006, blackhat/asia-2005, blackhat/eu-2005, blackhat/asia-2004, blackhat/eu-2004, blackhat/asia-2003, blackhat/eu-2003, blackhat/asia-2002, blackhat/eu-2002, blackhat/asia-2001, blackhat/eu-2001, blackhat/asia-2000, blackhat/eu-2000, blackhat/us-1999, blackhat/us-1998, blackhat/us-1997, defcon/dc-28, defcon/dc-14, defcon/dc-9, defcon/dc-8, defcon/dc-7, defcon/dc-6, defcon/dc-5, defcon/dc-4, defcon/dc-3, defcon/dc-2, defcon/dc-1, usenix/usenix-2024, usenix/usenix-2023, usenix/usenix-2022, usenix/usenix-2021, usenix/usenix-2020, usenix/usenix-2019, usenix/usenix-2018, usenix/usenix-2017, usenix/usenix-2016, usenix/usenix-2015, redteamvillage/all, hitcon/hitcon-2025, hitcon/hitcon-2024, hitcon/hitcon-2023, hitcon/hitcon-2022, hitcon/hitcon-2021, hitcon/hitcon-2020, hitcon/hitcon-2019, hitcon/hitcon-2018, hitcon/hitcon-2017, hitcon/hitcon-2016, pretalx/sec-t-2018, pretalx/sec-t-2019, pretalx/sec-t-2020, pretalx/sec-t-2021, pretalx/sec-t-2022, pretalx/sec-t-2023
+failed events: blackhat/eu-2026, blackhat/us-2026, blackhat/asia-2025, blackhat/eu-2023, blackhat/asia-2020, blackhat/us-2020, blackhat/asia-2019, blackhat/eu-2018, blackhat/us-2018, blackhat/asia-2014, blackhat/asia-2013, blackhat/us-2013, blackhat/eu-2010, blackhat/eu-2009, blackhat/us-2009, blackhat/asia-2008, blackhat/eu-2008, blackhat/us-2008, blackhat/asia-2007, blackhat/eu-2007, blackhat/asia-2006, blackhat/eu-2006, blackhat/asia-2005, blackhat/eu-2005, blackhat/asia-2004, blackhat/eu-2004, blackhat/asia-2003, blackhat/eu-2003, blackhat/asia-2002, blackhat/eu-2002, blackhat/asia-2001, blackhat/eu-2001, blackhat/asia-2000, blackhat/eu-2000, blackhat/us-1999, blackhat/us-1998, blackhat/us-1997, defcon/dc-28, defcon/dc-14, defcon/dc-9, defcon/dc-8, defcon/dc-7, defcon/dc-6, defcon/dc-5, defcon/dc-4, defcon/dc-3, defcon/dc-2, defcon/dc-1, usenix/usenix-2024, usenix/usenix-2023, usenix/usenix-2022, usenix/usenix-2021, usenix/usenix-2020, usenix/usenix-2019, usenix/usenix-2018, usenix/usenix-2017, usenix/usenix-2016, usenix/usenix-2015, redteamvillage/all, hitcon/hitcon-2025, hitcon/hitcon-2024, hitcon/hitcon-2023, hitcon/hitcon-2022, hitcon/hitcon-2021, hitcon/hitcon-2020, hitcon/hitcon-2019, hitcon/hitcon-2018, hitcon/hitcon-2017, hitcon/hitcon-2016
