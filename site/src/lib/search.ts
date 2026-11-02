@@ -37,8 +37,8 @@ export function buildIndex(sessions: Session[]): MiniSearch<{
       return {
         id: s.id,
         title: s.title,
-        speakers: s.speakers.map((p) => p.name).join(" "),
-        abstract: s.abstract,
+        speakers: (s.speakers ?? []).map((p) => p.name).join(" "),
+        abstract: s.abstract ?? "",
         compound: [...compound].join(" "),
       }
     })
@@ -73,7 +73,7 @@ export function runSearch(
     }
   }
   return [...merged]
-    .filter(([id]) => allowed.has(id))
+    .filter(([id]) => allowed.size === 0 || allowed.has(id)) // empty set = unrestricted
     .map(([id, score]) => ({ id, score }))
     .sort((a, b) => b.score - a.score)
 }

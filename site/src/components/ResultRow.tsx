@@ -30,10 +30,10 @@ function FileLink({ href, children }: { href: string; children: React.ReactNode 
 
 export function ResultRow({ s, terms }: { s: Session; terms: Set<string> }) {
   const [expanded, setExpanded] = useState(false)
-  const speakerLine = s.speakers
+  const speakerLine = (s.speakers ?? [])
     .map((p) => (p.company ? `${p.name} (${p.company})` : p.name))
     .join("; ")
-  const long = s.abstract.length > 320
+  const long = (s.abstract ?? "").length > 320
   // classification badge: {Conference}-{Region}-{Year} (region only where it
   // is a real distinction, i.e. Black Hat editions)
   const regionTag = s.event.label.match(/^(US|EU|Asia)-/)?.[1]
@@ -78,9 +78,9 @@ export function ResultRow({ s, terms }: { s: Session; terms: Set<string> }) {
         </p>
       )}
       <p className="mt-2.5 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-[13px]">
-        {s.files.slides && <FileLink href={s.files.slides}>Slides</FileLink>}
-        {s.files.whitepaper && <FileLink href={s.files.whitepaper}>Whitepaper</FileLink>}
-        {s.files.tool && <FileLink href={s.files.tool}>Tool</FileLink>}
+        {s.files?.slides && <FileLink href={s.files.slides}>Slides</FileLink>}
+        {s.files?.whitepaper && <FileLink href={s.files.whitepaper}>Whitepaper</FileLink>}
+        {s.files?.tool && <FileLink href={s.files.tool}>Tool</FileLink>}
         {s.video_url && <FileLink href={s.video_url}>Video</FileLink>}
         {long && (
           <button

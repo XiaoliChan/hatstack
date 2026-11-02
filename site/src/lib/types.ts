@@ -4,17 +4,18 @@ export interface Speaker {
   role: string | null
 }
 
+/** slimmed payloads omit empty fields — every field beyond id/event/title is optional */
 export interface Session {
   id: string
   conference?: string
   event: { region: "us" | "eu" | "asia"; year: number; label: string }
   title: string
-  speakers: Speaker[]
-  abstract: string
-  track: string | null
-  files: { slides: string | null; whitepaper: string | null; tool: string | null }
-  video_url: string | null
-  source_url: string | null
+  speakers?: Speaker[]
+  abstract?: string
+  track?: string | null
+  files?: { slides?: string | null; whitepaper?: string | null; tool?: string | null }
+  video_url?: string | null
+  source_url?: string | null
 }
 
 export interface ConferenceInfo {
@@ -30,9 +31,24 @@ export interface Dataset {
   sessions: Session[]
 }
 
-/** manifest comes from the crawler adapters via dataset.json; the builtin
+/** tiny first-paint payload: structure + counts without the sessions bulk */
+export interface Manifest {
+  version: string
+  total: number
+  conferences: ConferenceInfo[]
+  editions: {
+    key: string
+    conference: string
+    region: string
+    year: number
+    label: string
+    count: number
+  }[]
+}
+
+/** manifest comes from the crawler adapters via the dataset; the builtin
  * map below is only a fallback for older datasets / unknown ids */
-export function conferenceList(ds: Dataset): ConferenceInfo[] {
+export function conferenceList(ds: { conferences?: (string | ConferenceInfo)[] }): ConferenceInfo[] {
   return (ds.conferences ?? ["blackhat"]).map((c) =>
     typeof c === "string"
       ? { id: c, name: CONF_NAMES[c] ?? c, url: null, description: null }
@@ -81,7 +97,6 @@ const CONF_SHORT: Record<string, string> = {
 
 export interface DatasetMeta {
   total: number
-  withMaterials: number
   years: number[]
   oldestYear: number
   conferences: string[]
@@ -94,7 +109,6 @@ export function metaOf(ds: Dataset): DatasetMeta {
   )
   return {
     total: ds.sessions.length,
-    withMaterials: ds.sessions.filter((s) => s.files.slides || s.files.whitepaper).length,
     years,
     oldestYear: years[years.length - 1] ?? 0,
     conferences: [...new Set(ds.sessions.map((s) => s.conference ?? "blackhat"))],

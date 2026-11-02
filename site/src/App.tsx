@@ -4,12 +4,18 @@ import { ResultRow } from "@/components/ResultRow"
 import { SearchBox } from "@/components/SearchBox"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { buildIndex, queryTerms, runSearch } from "@/lib/search"
-import { conferenceList, editionKey, metaOf, type Dataset } from "@/lib/types"
+import {
+  conferenceList,
+  editionKey,
+  type Manifest,
+  type Session,
+} from "@/lib/types"
 
 const PAGE = 50
 
 export default function App() {
-  const [dataset, setDataset] = useState<Dataset | null>(null)
+  const [manifest, setManifest] = useState<Manifest | null>(null)
+  const [sessions, setSessions] = useState<Session[] | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [query, setQuery] = useState(
     () => new URLSearchParams(window.location.search).get("q") ?? ""
@@ -19,17 +25,34 @@ export default function App() {
   const [page, setPage] = useState(1)
   const [showFilters, setShowFilters] = useState(false)
 
+  // tier 1: tiny manifest — header + sidebar render immediately
   useEffect(() => {
-    // cache-bust: Pages caches dataset.json ~10min and stale data after a
-    // crawl deploy is the single most confusing failure for visitors
-    fetch(`${import.meta.env.BASE_URL}dataset.json?t=${Date.now()}`)
+    fetch(`${import.meta.env.BASE_URL}manifest.json?t=${Date.now()}`)
       .then((r) => {
         if (!r.ok) throw new Error(String(r.status))
         return r.json()
       })
-      .then(setDataset)
+      .then(setManifest)
       .catch(() => setLoadError(true))
   }, [])
+
+  // tier 2: version-addressed sessions (immutable -> browser-cached across
+  // visits); index builds on the main thread once (proven at 11k+ sessions)
+  const index = useMemo(
+    () => (sessions ? buildIndex(sessions) : null),
+    [sessions]
+  )
+  useEffect(() => {
+    if (!manifest) return
+    const vtag = manifest.version.replace(/:/g, "")
+    fetch(`${import.meta.env.BASE_URL}sessions-v${vtag}.json`)
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status))
+        return r.json()
+      })
+      .then((sessions: Session[]) => setSessions(sessions))
+      .catch(() => setLoadError(true))
+  }, [manifest])
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query.trim()), 300)
@@ -41,76 +64,53 @@ export default function App() {
     if (debounced) params.set("q", debounced)
     else params.delete("q")
     const qs = params.toString()
-    window.history.replaceState(null, "", qs ? `${window.location.pathname}?${qs}` : window.location.pathname)
+    window.history.replaceState(
+      null,
+      "",
+      qs ? `${window.location.pathname}?${qs}` : window.location.pathname
+    )
     setPage(1)
   }, [debounced])
 
   useEffect(() => setPage(1), [filters])
 
-  const index = useMemo(() => (dataset ? buildIndex(dataset.sessions) : null), [dataset])
-  const meta = useMemo(() => (dataset ? metaOf(dataset) : null), [dataset])
 
   const groups = useMemo<EditionGroup[]>(() => {
-    if (!dataset) return []
-    const confs = conferenceList(dataset)
-    const byConf = new Map<string, Map<string, { label: string; count: number }>>()
-    const regionsPerConf = new Map<string, Set<string>>()
-    const totals = new Map<string, number>()
-    for (const s of dataset.sessions) {
-      const conf = s.conference ?? "blackhat"
-      totals.set(conf, (totals.get(conf) ?? 0) + 1)
-      const regions = regionsPerConf.get(conf) ?? new Set()
-      regions.add(s.event.region)
-      regionsPerConf.set(conf, regions)
-      const key = editionKey(s)
-      const m = byConf.get(conf) ?? new Map()
-      const cur = m.get(key)
-      if (cur) cur.count += 1
-      else m.set(key, { label: "", count: 1 })
-      byConf.set(conf, m)
+    if (!manifest) return []
+    const byConf = new Map<string, typeof manifest.editions>()
+    for (const e of manifest.editions) {
+      const list = byConf.get(e.conference) ?? []
+      list.push(e)
+      byConf.set(e.conference, list)
     }
-    return confs
-      .filter((c) => (totals.get(c.id) ?? 0) > 0)
-      .map((c) => {
-        const multiRegion = (regionsPerConf.get(c.id)?.size ?? 0) > 1
-        const editions = [...(byConf.get(c.id)?.entries() ?? [])]
-          .map(([key, v]) => {
-            const [, region, yearStr] = key.split("|")
-            const year = Number(yearStr)
-            const regionTag = multiRegion ? region.toUpperCase() : null
-            const label =
-              year > 0 ? [regionTag, year].filter(Boolean).join("-") : [regionTag, "unknown"].filter(Boolean).join("-")
-            return { key, label, count: v.count }
-          })
-          .sort((a, b) => {
-            const ya = Number(a.key.split("|")[2])
-            const yb = Number(b.key.split("|")[2])
-            if (ya !== yb) return (yb > 0 ? yb : -1) - (ya > 0 ? ya : -1) // newest first, unknown last
-            return a.label.localeCompare(b.label)
-          })
-        return { conf: c, editions, count: totals.get(c.id) ?? 0 }
-      })
-  }, [dataset])
+    return conferenceList(manifest)
+      .filter((c) => byConf.has(c.id))
+      .map((c) => ({
+        conf: c,
+        editions: (byConf.get(c.id) ?? []).map((e) => ({
+          key: e.key,
+          label: e.label,
+          count: e.count,
+        })),
+        count: (byConf.get(c.id) ?? []).reduce((n, e) => n + e.count, 0),
+      }))
+  }, [manifest])
 
   const results = useMemo(() => {
-    if (!dataset || !index) return []
+    if (!sessions) return []
     const edition = filters.edition
-    const allowed = new Set(
-      dataset.sessions
-        .filter((s) => {
-          if (!edition) return true
-          if (!edition.includes("|")) return (s.conference ?? "blackhat") === edition
-          return editionKey(s) === edition
-        })
-        .map((s) => s.id)
-    )
-    if (!debounced) {
-      return dataset.sessions.filter((s) => allowed.has(s.id))
-    }
-    const hits = runSearch(index, debounced, allowed)
-    const byId = new Map(dataset.sessions.map((s) => [s.id, s]))
-    return hits.map((h) => byId.get(h.id)).filter((s): s is NonNullable<typeof s> => !!s)
-  }, [dataset, index, debounced, filters])
+    const pool = edition
+      ? sessions.filter((s) =>
+          edition.includes("|") ? editionKey(s) === edition : (s.conference ?? "blackhat") === edition
+        )
+      : sessions
+    if (!debounced) return pool
+    if (!index) return []
+    const byId = new Map(pool.map((s) => [s.id, s]))
+    return runSearch(index, debounced, new Set(pool.map((s) => s.id)))
+      .map((h) => byId.get(h.id))
+      .filter((s): s is Session => !!s)
+  }, [sessions, filters, debounced, index])
 
   const terms = useMemo(() => new Set(queryTerms(debounced)), [debounced])
 
@@ -124,6 +124,11 @@ export default function App() {
     }
     return nums
   }, [page, totalPages])
+
+  const yearRange = useMemo(() => {
+    const ys = (manifest?.editions ?? []).map((e) => e.year).filter((y) => y > 0)
+    return ys.length ? `${Math.min(...ys)}–${Math.max(...ys)}` : ""
+  }, [manifest])
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
@@ -146,15 +151,15 @@ export default function App() {
           </div>
         </header>
         <p className="text-[13px] text-muted-foreground pb-6">
-          {meta ? (
+          {manifest ? (
             <>
-              every security conference, one search box · {meta.total.toLocaleString()} talks ·{" "}
-              {meta.withMaterials.toLocaleString()} with materials · {meta.oldestYear}–{meta.years[0]}
+              every security conference, one search box · {manifest.total.toLocaleString()} talks
+              {yearRange && ` · ${yearRange}`}
             </>
           ) : loadError ? (
-            "Couldn't load dataset.json"
+            "Couldn't load manifest.json"
           ) : (
-            "Loading index…"
+            "Loading…"
           )}
         </p>
 
@@ -169,13 +174,13 @@ export default function App() {
         </button>
 
         <div className="mt-4 lg:grid lg:grid-cols-[240px_1fr] lg:gap-10">
-          {meta && (
+          {manifest && (
             <FilterSidebar
               filters={filters}
               setFilters={setFilters}
               groups={groups}
               resultCount={results.length}
-              total={meta.total}
+              total={manifest.total}
               className={`${showFilters ? "block mb-6" : "hidden"} lg:block lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100dvh-5rem)] lg:overflow-y-auto sidebar-scroll pr-1`}
             />
           )}
@@ -195,7 +200,12 @@ export default function App() {
                 .
               </p>
             )}
-            {dataset && results.length === 0 && (
+            {manifest && !sessions && !loadError && (
+              <p className="py-10 text-sm text-muted-foreground">
+                Loading {manifest.total.toLocaleString()} talks…
+              </p>
+            )}
+                        {sessions && results.length === 0 && (debounced || filters.edition) && (
               <div className="py-10 text-sm text-muted-foreground">
                 <p>No talks match {debounced ? `“${debounced}”` : "these filters"}.</p>
                 <button
@@ -218,19 +228,27 @@ export default function App() {
                 <button
                   type="button"
                   disabled={page === 1}
-                  onClick={() => { setPage((p) => p - 1); window.scrollTo({ top: 0 }) }}
+                  onClick={() => {
+                    setPage((p) => p - 1)
+                    window.scrollTo({ top: 0 })
+                  }}
                   className="h-8 px-3 rounded-md border border-line text-[13px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors disabled:opacity-30 disabled:pointer-events-none"
                 >
                   prev
                 </button>
                 {pageNumbers.map((n, i) =>
                   n === "…" ? (
-                    <span key={`e${i}`} className="text-muted-foreground/60 text-[13px] px-1">…</span>
+                    <span key={`e${i}`} className="text-muted-foreground/60 text-[13px] px-1">
+                      …
+                    </span>
                   ) : (
                     <button
                       key={n}
                       type="button"
-                      onClick={() => { setPage(n); window.scrollTo({ top: 0 }) }}
+                      onClick={() => {
+                        setPage(n)
+                        window.scrollTo({ top: 0 })
+                      }}
                       aria-current={n === page ? "page" : undefined}
                       className={
                         "h-8 min-w-8 px-2 rounded-md text-[13px] tabular-nums transition-colors " +
@@ -246,7 +264,10 @@ export default function App() {
                 <button
                   type="button"
                   disabled={page === totalPages}
-                  onClick={() => { setPage((p) => p + 1); window.scrollTo({ top: 0 }) }}
+                  onClick={() => {
+                    setPage((p) => p + 1)
+                    window.scrollTo({ top: 0 })
+                  }}
                   className="h-8 px-3 rounded-md border border-line text-[13px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors disabled:opacity-30 disabled:pointer-events-none"
                 >
                   next
@@ -270,7 +291,7 @@ export default function App() {
             >
               Source &amp; crawler
             </a>
-            {dataset && ` · dataset ${dataset.version}`}
+            {manifest && ` · dataset ${manifest.version}`}
           </p>
         </footer>
       </div>
