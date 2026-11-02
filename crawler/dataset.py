@@ -246,7 +246,8 @@ def write_outputs(dataset: dict, per_conf: dict[str, dict[str, dict]], out_dir: 
     }
     atomic_write_json(out_dir / "manifest.json", manifest)
     slim_sessions = [_slim(s) for s in dataset["sessions"]]
-    atomic_write_json(out_dir / f"sessions-v{dataset['version']}.json", slim_sessions)
+    vtag = dataset["version"].replace(":", "")
+    atomic_write_json(out_dir / f"sessions-v{vtag}.json", slim_sessions)
     return {"dataset": ds_path, "report_md": report_dir / "summary.md",
             "manifest": out_dir / "manifest.json",
-            "sessions": out_dir / f"sessions-v{dataset['version']}.json"}
+            "sessions": out_dir / f"sessions-v{vtag}.json"}
