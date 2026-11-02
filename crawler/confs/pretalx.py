@@ -51,12 +51,17 @@ def collect_edition(instance: str, conf: dict, slug: str, year: int, log=None) -
     except Exception as e:
         return {"status": "failed", "meta": {"trace": [f"{slug}: bad json {e!r}"]}}
 
-    talks = [
-        t
-        for day in data.get("schedule", {}).get("conference", {}).get("days", [])
-        for room in day.get("rooms", [])
-        for t in room.get("talks", [])
-    ]
+    # pretalx export: days[].rooms is a {room_name: [talks]} dict; frab
+    # export uses [{name, talks}] lists — handle both
+    talks = []
+    for day in data.get("schedule", {}).get("conference", {}).get("days", []):
+        rooms = day.get("rooms") or {}
+        if isinstance(rooms, dict):
+            for talk_list in rooms.values():
+                talks.extend(talk_list or [])
+        else:
+            for room in rooms:
+                talks.extend(room.get("talks", []) or [])
     records = []
     for t in talks:
         title = (t.get("title") or "").strip()
