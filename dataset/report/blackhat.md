@@ -13,7 +13,7 @@
 | asia-2023 | ok | json | 44 | li=None | OK json (52 sessions) from 20250905091420 |
 | eu-2023 | failed | - | 0 |  | all attempts exhausted |
 | us-2023 | ok | json | 109 | li=None | OK json (117 sessions) from 20241209095320 |
-| asia-2022 | ok | json | 34 | li=None | OK json (34 sessions) from 20220720113646 |
+| asia-2022 | failed | - | 0 |  | all attempts exhausted |
 | eu-2022 | ok | json | 44 | li=None | OK json (52 sessions) from 20250526102859 |
 | us-2022 | ok | json | 101 | li=None | OK json (109 sessions) from 20250905112833 |
 | asia-2021 | ok | json | 40 | li=None | OK json (40 sessions) from 20251103175601 |
@@ -39,7 +39,7 @@
 | us-2015 | ok | legacy | 92 |  | legacy page 296839B, pdf refs 146 |
 | asia-2014 | failed | - | 0 |  | all attempts exhausted |
 | eu-2014 | ok | legacy | 34 |  | got 116987B page via web.archive.org: https://www.blackhat.com/eu-14/briefings.html (pdfs: 56) |
-| us-2014 | ok | legacy | 90 |  | got 261052B page via web.archive.org: https://www.blackhat.com/us-14/archives.html (pdfs: 137) |
+| us-2014 | failed | - | 0 |  | all attempts exhausted |
 | asia-2013 | failed | - | 0 |  | all attempts exhausted |
 | eu-2013 | ok | legacy | 29 |  | legacy page 103110B, pdf refs 51 |
 | us-2013 | failed | - | 0 |  | all attempts exhausted |
@@ -47,7 +47,7 @@
 | us-2012 | ok | legacy | 73 |  | got 237713B page via web.archive.org: https://www.blackhat.com/html/bh-us-12/bh-us-12-archives.html (pdfs: 147) |
 | eu-2011 | ok | legacy | 20 |  | legacy page 56509B, pdf refs 24 |
 | us-2011 | ok | legacy | 59 |  | legacy page 174374B, pdf refs 108 |
-| eu-2010 | failed | - | 0 |  | all attempts exhausted |
+| eu-2010 | failed | - | 0 |  | no usable wayback capture |
 | us-2010 | ok | legacy | 75 |  | got 199104B page via web.archive.org: https://www.blackhat.com/html/bh-us-10/bh-us-10-archives.html (pdfs: 113) |
 | eu-2009 | failed | - | 0 |  | no usable wayback capture |
 | us-2009 | failed | - | 0 |  | no usable wayback capture |
