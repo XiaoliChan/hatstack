@@ -176,7 +176,7 @@ export default function App() {
               groups={groups}
               resultCount={results.length}
               total={meta.total}
-              className={`${showFilters ? "block mb-6" : "hidden"} lg:block lg:sticky lg:top-6 lg:self-start`}
+              className={`${showFilters ? "block mb-6" : "hidden"} lg:block lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100dvh-5rem)] lg:overflow-y-auto sidebar-scroll pr-1`}
             />
           )}
 
