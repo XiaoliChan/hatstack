@@ -216,4 +216,37 @@ def write_outputs(dataset: dict, per_conf: dict[str, dict[str, dict]], out_dir: 
             + "\n".join(rows) + "\n",
             encoding="utf-8",
         )
-    return {"dataset": ds_path, "report_md": report_dir / "summary.md"}
+    # site payload tier: tiny manifest (instant first paint) + versioned
+    # sessions file (content-addressed -> immutable browser caching).
+    # Nulls are stripped: 45k null fields were ~1MB of dead weight.
+    def _slim(s: dict) -> dict:
+        out = {}
+        for k, v in s.items():
+            if v is None or v == "" or v == []:
+                continue
+            if k == "files" and isinstance(v, dict):
+                files = {fk: fv for fk, fv in v.items() if fv}
+                if files:
+                    out["files"] = files
+                continue
+            if k == "speakers":
+                out["speakers"] = [{sk: sv for sk, sv in sp.items() if sv} for sp in v]
+                continue
+            out[k] = v
+        return out
+
+    manifest = {
+        "version": dataset["version"],
+        "total": len(dataset["sessions"]),
+        "conferences": dataset.get("conferences", []),
+        "editions": [
+            {k: e[k] for k in ("key", "conference", "region", "year", "label", "count")}
+            for e in dataset.get("editions", [])
+        ],
+    }
+    atomic_write_json(out_dir / "manifest.json", manifest)
+    slim_sessions = [_slim(s) for s in dataset["sessions"]]
+    atomic_write_json(out_dir / f"sessions-v{dataset['version']}.json", slim_sessions)
+    return {"dataset": ds_path, "report_md": report_dir / "summary.md",
+            "manifest": out_dir / "manifest.json",
+            "sessions": out_dir / f"sessions-v{dataset['version']}.json"}
