@@ -1,7 +1,7 @@
 # Crawl completeness report
 
-- dataset version: 2026-11-03T05:06:58Z
-- total sessions: 12412
+- dataset version: 2026-11-03T05:12:05Z
+- total sessions: 12548
 - sessions with slides: 4520
 - sessions with whitepaper: 667
 - sessions with tool: 78
@@ -11,7 +11,7 @@
 
 | event | status | kind | sessions | note |
 |---|---|---|---|---|
-| eu-2026 | ok | rendered | 16 |  | falling back to rendered DOM (40 rows) |
+| eu-2026 | ok | rendered | 48 |  | falling back to rendered DOM (40 rows) |
 | us-2026 | failed | - | 0 |  | all attempts exhausted |
 | asia-2025 | ok | json | 48 | li=None | OK json (56 sessions) from 20250921094336 |
 | eu-2025 | ok | json | 0 | li=None | OK json (3 sessions) from 20250910093528 |
@@ -22,20 +22,20 @@
 | asia-2023 | ok | json | 44 | li=None | OK json (52 sessions) from 20250905091420 |
 | eu-2023 | ok | json | 44 | li=None | OK json (52 sessions) from 20250503021943 |
 | us-2023 | ok | json | 109 | li=None | OK json (117 sessions) from 20241209095320 |
-| asia-2022 | ok | rendered | 14 |  | falling back to rendered DOM (28 rows) |
+| asia-2022 | ok | rendered | 34 |  | falling back to rendered DOM (28 rows) |
 | eu-2022 | ok | json | 44 | li=None | OK json (52 sessions) from 20250526102859 |
 | us-2022 | ok | json | 101 | li=None | OK json (109 sessions) from 20250905112833 |
 | asia-2021 | ok | json | 40 | li=None | OK json (40 sessions) from 20251103175601 |
 | eu-2021 | ok | json | 72 | li=None | OK json (72 sessions) from 20260213092619 |
 | us-2021 | ok | json | 131 | li=None | OK json (131 sessions) from 20240904133539 |
-| asia-2020 | ok | rendered | 14 |  | falling back to rendered DOM (28 rows) |
+| asia-2020 | ok | rendered | 39 |  | falling back to rendered DOM (28 rows) |
 | eu-2020 | ok | json | 39 | li=None | OK json (39 sessions) from 20220814092601 |
 | us-2020 | ok | json | 94 | li=None | OK json (94 sessions) from 20241005102052 |
-| asia-2019 | ok | rendered | 12 |  | falling back to rendered DOM (24 rows) |
+| asia-2019 | ok | rendered | 38 |  | falling back to rendered DOM (24 rows) |
 | eu-2019 | ok | json | 46 | li=None | OK json (61 sessions) from 20220924074936 |
 | us-2019 | ok | json | 124 | li=None | OK json (124 sessions) from 20250203150129 |
 | asia-2018 | ok | legacy | 30 |  | got 117796B page via web.archive.org: https://www.blackhat.com/asia-18/briefings.html (pdfs: 40) |
-| eu-2018 | ok | rendered | 13 |  | falling back to rendered DOM (26 rows) |
+| eu-2018 | ok | rendered | 46 |  | falling back to rendered DOM (26 rows) |
 | us-2018 | ok | json | 118 | li=None | OK json (118 sessions) from 20250320203753 |
 | asia-2017 | ok | legacy | 28 |  | legacy page 119511B, pdf refs 41 |
 | eu-2017 | ok | legacy | 42 |  | legacy page 143946B, pdf refs 66 |
