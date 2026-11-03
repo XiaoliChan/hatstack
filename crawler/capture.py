@@ -201,42 +201,38 @@ def _capture_json(page, url: str, expected_year: int, log=None) -> dict | None:
 
 
 def harvest_detail_modals(page, log=None) -> str:
-    """Click each session link; the detail modal (#session_desc_<data-id>)
-    renders with bh_files slides/whitepaper links. Extract modal HTML into
-    cal_detail_<data-id> fragments so parse_rendered_schedule reads them."""
-    collect_links = """() => {
-      const seen = new Set();
-      const out = [];
-      const NOISE = /breakfast|lunch|break\b|registration|reception|coffee|party|award/i;
-      for (const a of document.querySelectorAll('[itemprop=summary] a, ul#cal_content_Day a')) {
-        const href = a.getAttribute('href') || '';
-        if (!href.startsWith('#')) continue;
-        const m = href.match(/(\d+)$/);
-        if (!m) continue;
-        const did = a.getAttribute('data-id') || m[1];
-        if (seen.has(did)) continue;
-        const txt = (a.textContent || '');
-        if (NOISE.test(txt)) continue;
-        seen.add(did);
-        out.push({did, href, txt: txt.slice(0, 60)});
-      }
-      return out;
-    }"""
+    """Click each real-talk session link exactly like the proven v3 probe:
+    ElementHandle.click() + 3s wait, extract the open #session_desc_<id>
+    modal, collect its material links, close, next. Errors go to trace."""
     try:
-        links = page.evaluate(collect_links)
+        handles = page.query_selector_all("[itemprop=summary] a, ul#cal_content_Day a")
     except Exception as e:
         if log:
-            log(f"detail link enumeration failed: {e!r}")
+            log(f"link enumeration failed: {e!r}")
         return ""
-    if not links:
-        return ""
+    NOISE = re.compile(r"breakfast|lunch|break\b|registration|reception|coffee|party|award", re.I)
     out = []
     n = 0
-    for l in links:
-        did, txt = l["did"], l.get("txt", "")
+    errs: list[str] = []
+    idx = 0
+    for h in handles:
+        idx += 1
         try:
-            page.evaluate(f"location.hash = '#session-{did}'")
-            page.wait_for_selector(f"#session_desc_{did}", timeout=8000)
+            txt = h.inner_text() or ""
+        except Exception:
+            continue
+        if not txt or len(txt) < 8 or NOISE.search(txt):
+            continue
+        href = h.get_attribute("href") or ""
+        if not href.startswith("#"):
+            continue
+        m = re.search(r"(\d+)$", href)
+        did = h.get_attribute("data-id") or (m.group(1) if m else "")
+        if not did:
+            continue
+        try:
+            h.click(timeout=4000)
+            page.wait_for_selector(f"#session_desc_{did}", timeout=6000)
             modal_html = page.evaluate(
                 f"() => {{ const el = document.querySelector('#session_desc_{did}');"
                 " return el ? el.outerHTML : ''; }}"
@@ -244,15 +240,23 @@ def harvest_detail_modals(page, log=None) -> str:
             if modal_html:
                 out.append(f'<div id="cal_detail_{did}" style="display:none">{modal_html}</div>')
                 n += 1
-                if log and n % 25 == 0:
-                    log(f"  modals harvested so far: {n}")
-            page.evaluate("location.hash = ''")
+                if log and n % 20 == 0:
+                    log(f"  modals so far: {n}")
+            else:
+                errs.append(f"{did}: modal empty")
+            page.keyboard.press("Escape")
+            time.sleep(0.6)
+        except Exception as e:
+            errs.append(f"{did}: {e!r}"[:120])
+            try:
+                page.keyboard.press("Escape")
+            except Exception:
+                pass
             time.sleep(0.5)
-        except Exception:
-            page.evaluate("location.hash = ''")
-            continue
     if log:
-        log(f"detail modals harvested: {n}/{len(links)}")
+        log(f"detail modals harvested: {n} | errors: {len(errs)}")
+        for e in errs[:5]:
+            log(f"  err: {e}")
     return "".join(out)
 def _capture_legacy(page, url: str, log=None) -> dict | None:
     html = page.content()
