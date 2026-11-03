@@ -2,7 +2,7 @@
 
 | event | status | kind | sessions | note |
 |---|---|---|---|---|
-| eu-2026 | failed | - | 0 |  | all attempts exhausted |
+| eu-2026 | ok | rendered | 16 |  | falling back to rendered DOM (40 rows) |
 | us-2026 | failed | - | 0 |  | all attempts exhausted |
 | asia-2025 | ok | json | 48 | li=None | OK json (56 sessions) from 20250921094336 |
 | eu-2025 | ok | json | 0 | li=None | OK json (3 sessions) from 20250910093528 |
