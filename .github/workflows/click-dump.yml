@@ -63,7 +63,7 @@ jobs:
               link = page.query_selector("[itemprop=summary] a")
               print("first link found:", bool(link))
               if link:
-                  print("link text:", (link.get_text(" ", strip=True) or "")[:60])
+                  print("link text:", (link.inner_text() or "")[:60])
                   print("link attrs:", link.evaluate("e => JSON.stringify({id: e.id, dataId: e.getAttribute('data-id'), href: e.getAttribute('href'), cls: e.className})"))
                   link.click()
                   time.sleep(6)
