@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import random
+import re
 import time
 
 UA = (
@@ -178,10 +179,16 @@ def _capture_json(page, url: str, expected_year: int, log=None) -> dict | None:
     # the schedule from inline data — harvest the rendered DOM instead.
     # us-26-style pages use different markup (rendered_li==0) but carry
     # [itemprop=summary] rows — those count too.
-    try:
-        itemprop_links = page.locator("[itemprop=summary] a").count()
-    except Exception:
-        itemprop_links = 0
+    # rows load async — poll up to ~45s before deciding there is nothing
+    for _ in range(9):
+        try:
+            itemprop_links = page.locator("[itemprop=summary] a").count()
+        except Exception:
+            itemprop_links = 0
+        rendered = max(rendered, page.locator("ul#cal_content_Day li").count())
+        if rendered > 0 or itemprop_links >= 3:
+            break
+        time.sleep(5)
     if rendered > 0 or itemprop_links >= 3:
         details_html = harvest_detail_modals(page, log=log)
         html = page.content()
