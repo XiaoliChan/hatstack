@@ -201,12 +201,13 @@ def _capture_json(page, url: str, expected_year: int, log=None) -> dict | None:
 
 
 def harvest_detail_modals(page, log=None) -> str:
-    """Click each session link; whatever NEW material links (.pdf / deck hosts)
-    appear belongs to that talk. Inject them as hidden cal_detail_<id>
-    fragments so parse_rendered_schedule picks them up via its normal path."""
+    """Click each session link; the detail modal (#session_desc_<data-id>)
+    renders with bh_files slides/whitepaper links. Extract modal HTML into
+    cal_detail_<data-id> fragments so parse_rendered_schedule reads them."""
     collect_links = """() => {
       const seen = new Set();
       const out = [];
+      const NOISE = /breakfast|lunch|break\b|registration|reception|coffee|party|award/i;
       for (const a of document.querySelectorAll('[itemprop=summary] a, ul#cal_content_Day a')) {
         const href = a.getAttribute('href') || '';
         if (!href.startsWith('#')) continue;
@@ -214,8 +215,10 @@ def harvest_detail_modals(page, log=None) -> str:
         if (!m) continue;
         const did = a.getAttribute('data-id') || m[1];
         if (seen.has(did)) continue;
+        const txt = (a.textContent || '');
+        if (NOISE.test(txt)) continue;
         seen.add(did);
-        out.push({did, href, sel: `a[data-id="${did}"]`});
+        out.push({did, href, txt: txt.slice(0, 60)});
       }
       return out;
     }"""
@@ -227,51 +230,30 @@ def harvest_detail_modals(page, log=None) -> str:
         return ""
     if not links:
         return ""
-    material_links_js = """() => Array.from(
-        document.querySelectorAll("a[href$='.pdf'], a[href*='speakerdeck'], a[href*='slideshare']")
-    ).map(a => a.href)"""
-    try:
-        baseline = set(page.evaluate(material_links_js))
-    except Exception:
-        baseline = set()
     out = []
     n = 0
     for l in links:
-        did, href = l["did"], l["href"]
+        did, txt = l["did"], l.get("txt", "")
         try:
-            # tag the link with its id so the saved HTML carries data-id
-            page.evaluate(
-                """([sel, did]) => {
-                  for (const a of document.querySelectorAll(sel + ', a[href="' + sel.slice(9,-2) + '"]')) {}
-                  for (const a of document.querySelectorAll('[itemprop=summary] a, ul#cal_content_Day a')) {
-                    const h = a.getAttribute('href') || '';
-                    const m = h.match(/(\d+)$/);
-                    if (m && m[1] === did) a.setAttribute('data-id', did);
-                  }
-                }""",
-                [f'a[data-id="{did}"]', did],
+            page.evaluate(f"location.hash = '#session-{did}'")
+            page.wait_for_selector(f"#session_desc_{did}", timeout=8000)
+            modal_html = page.evaluate(
+                f"() => {{ const el = document.querySelector('#session_desc_{did}');"
+                " return el ? el.outerHTML : ''; }}"
             )
-            try:
-                page.click(f'a[data-id="{did}"]', timeout=3000)
-            except Exception:
-                page.evaluate(f"location.hash = '#{href.lstrip(chr(35))}'")
-            time.sleep(1.5)
-            current = set(page.evaluate(material_links_js) or [])
-            new_links = [u for u in current if u not in baseline]
-            baseline = baseline | set(current)
-            if new_links:
-                frag = "".join(f'<a href="{u}">material</a>' for u in new_links)
-                out.append(f'<div id="cal_detail_{did}" style="display:none">{frag}</div>')
+            if modal_html:
+                out.append(f'<div id="cal_detail_{did}" style="display:none">{modal_html}</div>')
                 n += 1
+                if log and n % 25 == 0:
+                    log(f"  modals harvested so far: {n}")
             page.evaluate("location.hash = ''")
-            time.sleep(0.3)
+            time.sleep(0.5)
         except Exception:
+            page.evaluate("location.hash = ''")
             continue
     if log:
-        log(f"detail harvest (click-diff): {n}/{len(links)} talks yielded materials")
+        log(f"detail modals harvested: {n}/{len(links)}")
     return "".join(out)
-
-
 def _capture_legacy(page, url: str, log=None) -> dict | None:
     html = page.content()
     n_pdfs = html.lower().count(".pdf")
