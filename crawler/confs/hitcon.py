@@ -81,8 +81,10 @@ def collect_year(year: int, log=None) -> dict:
     for path in (f"https://hitcon.org/{year}/agenda/",
                  f"https://hitcon.org/{year}/en/agenda/",
                  f"https://hitcon.org/{year}/"):
-        ts = f"{year}1201" if year >= 2022 else f"{year + 1}0301"
-        body = wayback_get(path, ts)
+        for ts in (f"{year}1201", f"{year}0101", f"{year + 1}0301"):
+            body = wayback_get(path, ts)
+            if body:
+                break
         if not body:
             continue
         html = body.decode("utf-8", "replace")
