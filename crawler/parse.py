@@ -237,6 +237,57 @@ def parse_rendered_schedule(event: dict, html: str) -> list[dict]:
     soup = BeautifulSoup(html, "lxml")
     records = []
     seen: set[str] = set()
+    # structured rows first (itemprop-rich schedule markup)
+    for row in soup.select("li.cal_row_content, [id^=cal_session_]"):
+        link = row.select_one("[itemprop=summary] a") or row.find("a", href=re.compile("#"))
+        if not link:
+            continue
+        title = link.get_text(" ", strip=True)
+        if not title or len(title) < 6:
+            continue
+        if re.search(r"breakfast|lunch|break\b|registration|reception|party|coffee|happy hour", title, re.I):
+            continue
+        key = title.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        speakers = []
+        for sp in row.select("[itemprop=performers]"):
+            txt = sp.get_text(" ", strip=True)
+            txt = re.sub(r"^(Speaker[s]?|Contributor[s]?)\s*:?\s*", "", txt, flags=re.I)
+            txt = re.sub(r"\bContributor[s]?\s*:\s*", "", txt)
+            txt = re.sub(r"Location\s*:.*$", "", txt)
+            for name in re.split(r"[,;·]|\s{2,}|\s+and\s+", txt):
+                name = name.strip(" ,;·")
+                if 3 < len(name) < 50 and not re.search(r"\d|TBD|Speaker", name, re.I):
+                    speakers.append({"name": name, "company": None, "role": None})
+        anchor = (link.get("href") or "").lstrip("#")
+        scope = soup.find(id=re.compile(re.escape(anchor))) if anchor else None
+        scope = scope or row
+        files = {"slides": None, "whitepaper": None, "tool": None}
+        for a2 in scope.find_all("a", href=True):
+            h = a2["href"]
+            if h.lower().endswith(".pdf"):
+                if "-wp" in h.rsplit("/", 1)[-1] and not files["whitepaper"]:
+                    files["whitepaper"] = _norm_file_url(h)
+                elif not files["slides"]:
+                    files["slides"] = _norm_file_url(h)
+        desc = scope.find(class_=re.compile("desc|abstract|session-detail", re.I))
+        records.append(
+            {
+                "id": f"{label.lower().replace('-', '')}-{re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')[:60]}",
+                "event": {"region": event["region"], "year": event["year"], "label": label},
+                "title": title,
+                "speakers": speakers[:5],
+                "abstract": desc.get_text(" ", strip=True)[:4000] if desc else "",
+                "track": None,
+                "files": files,
+                "video_url": None,
+                "source_url": event.get("source_url"),
+            }
+        )
+    if records:
+        return records
     for li in soup.select("ul#cal_content_Day li"):
         a = li.find("a", attrs={"href": re.compile("#")})
         if not a:
