@@ -261,13 +261,21 @@ def parse_rendered_schedule(event: dict, html: str) -> list[dict]:
                 name = name.strip(" ,;·")
                 if 3 < len(name) < 50 and not re.search(r"\d|TBD|Speaker", name, re.I):
                     speakers.append({"name": name, "company": None, "role": None})
-        anchor = (link.get("href") or "").lstrip("#")
-        scope = soup.find(id=re.compile(re.escape(anchor))) if anchor else None
+        # detail modal harvested by the crawler is keyed cal_detail_<data-id>
+        data_id = link.get("data-id")
+        scope = None
+        if data_id:
+            scope = soup.find(id=f"cal_detail_{data_id}")
+        if scope is None:
+            anchor = (link.get("href") or "").lstrip("#")
+            scope = soup.find(id=re.compile(re.escape(anchor))) if anchor else None
         scope = scope or row
         files = {"slides": None, "whitepaper": None, "tool": None}
         for a2 in scope.find_all("a", href=True):
             h = a2["href"]
-            if h.lower().endswith(".pdf"):
+            label_txt = a2.get_text(" ", strip=True).lower()
+            is_slide_link = h.lower().endswith(".pdf") or "speakerdeck" in h or "slideshare" in h or "slide" in label_txt
+            if is_slide_link:
                 if "-wp" in h.rsplit("/", 1)[-1] and not files["whitepaper"]:
                     files["whitepaper"] = _norm_file_url(h)
                 elif not files["slides"]:

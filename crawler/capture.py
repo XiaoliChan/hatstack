@@ -177,16 +177,62 @@ def _capture_json(page, url: str, expected_year: int, log=None) -> dict | None:
     # some years don't fetch sessions.json via XHR but the page still renders
     # the schedule from inline data — harvest the rendered DOM instead
     if rendered > 0:
+        details_html = harvest_detail_modals(page, log=log)
+        html = page.content()
+        if details_html:
+            # append extracted modals so the parser can find slides per session
+            html = html + "<div id='harvested_details'>" + details_html + "</div>"
         if log:
-            log(f"falling back to rendered DOM ({rendered} rows)")
+            log(f"falling back to rendered DOM ({rendered} rows, {len(details_html)}B detail modals)")
         return {
             "status": "ok",
             "kind": "rendered",
-            "html": page.content(),
+            "html": html,
             "rendered_li": rendered,
             "year": expected_year,
         }
     return None
+
+
+def harvest_detail_modals(page, log=None) -> str:
+    """Click each session link to force its detail modal to render, extract
+    the modal HTML (contains bh_files slides/whitepaper links), return the
+    concatenated fragments keyed by session data-id."""
+    try:
+        links = page.eval_on_selector_all(
+            "ul#cal_content_Day a.sd_link[data-id], [id^=cal_title_] a[data-id]",
+            "els => els.map(e => ({id: e.getAttribute('data-id'), href: e.getAttribute('href')}))",
+        )
+    except Exception as e:
+        if log:
+            log(f"detail link enumeration failed: {e!r}")
+        return ""
+    if not links:
+        return ""
+    out = []
+    n = 0
+    for l in links:
+        did = l.get("id")
+        anchor = (l.get("href") or "").lstrip("#")
+        if not did:
+            continue
+        try:
+            page.evaluate(f"location.hash = '#{anchor}'")
+            page.wait_for_selector(f"#cal_detail_{did}", timeout=5000)
+            html = page.evaluate(
+                f"() => {{ const el = document.querySelector('#cal_detail_{did}');"
+                " return el ? el.outerHTML : ''; }}"
+            )
+            if html:
+                out.append(f'<div id="cal_detail_{did}">{html}</div>')
+                n += 1
+            page.evaluate("location.hash = ''")
+            time.sleep(0.4)
+        except Exception:
+            continue
+    if log:
+        log(f"detail modals harvested: {n}/{len(links)}")
+    return "".join(out)
 
 
 def _capture_legacy(page, url: str, log=None) -> dict | None:
