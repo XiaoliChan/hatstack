@@ -208,42 +208,37 @@ def _capture_json(page, url: str, expected_year: int, log=None) -> dict | None:
 
 
 def harvest_detail_modals(page, log=None) -> str:
-    """Click each real-talk session link exactly like the proven v3 probe:
-    ElementHandle.click() + 3s wait, extract the open #session_desc_<id>
-    modal, collect its material links, close, next. Errors go to trace."""
+    """Navigate hash to each talk's full-slug anchor (native modal opener —
+    the site opens the detail on hashchange, exactly like a user's #link),
+    wait for #session_desc_<id>, extract modal HTML per talk."""
     try:
-        handles = page.query_selector_all("[itemprop=summary] a, ul#cal_content_Day a")
+        links = page.eval_on_selector_all(
+            "[itemprop=summary] a[href^='#'], ul#cal_content_Day a[href^='#']",
+            """els => els.map(e => {
+              const href = e.getAttribute('href') || '';
+              const m = href.match(/(\d+)$/);
+              return {did: e.getAttribute('data-id') || (m && m[1]), href: href.replace(/^#/, '')};
+            }).filter(x => x.did)""",
+        )
     except Exception as e:
         if log:
             log(f"link enumeration failed: {e!r}")
         return ""
-    NOISE = re.compile(r"breakfast|lunch|break\b|registration|reception|coffee|party|award", re.I)
+    if not links:
+        return ""
     out = []
     n = 0
     errs: list[str] = []
-    idx = 0
-    for h in handles:
-        idx += 1
+    extract_js = """did => {
+      const el = document.querySelector('#session_desc_' + did);
+      return el ? el.outerHTML : '';
+    }"""
+    for l in links:
+        did, anchor = l["did"], l["href"]
         try:
-            txt = h.inner_text() or ""
-        except Exception:
-            continue
-        if not txt or len(txt) < 8 or NOISE.search(txt):
-            continue
-        href = h.get_attribute("href") or ""
-        if not href.startswith("#"):
-            continue
-        m = re.search(r"(\d+)$", href)
-        did = h.get_attribute("data-id") or (m.group(1) if m else "")
-        if not did:
-            continue
-        try:
-            h.click(timeout=4000)
-            page.wait_for_selector(f"#session_desc_{did}", timeout=6000)
-            modal_html = page.evaluate(
-                f"() => {{ const el = document.querySelector('#session_desc_{did}');"
-                " return el ? el.outerHTML : ''; }}"
-            )
+            page.evaluate("h => { location.hash = h; }", anchor)
+            page.wait_for_selector(f"#session_desc_{did}", timeout=8000)
+            modal_html = page.evaluate(extract_js, did)
             if modal_html:
                 out.append(f'<div id="cal_detail_{did}" style="display:none">{modal_html}</div>')
                 n += 1
@@ -251,15 +246,8 @@ def harvest_detail_modals(page, log=None) -> str:
                     log(f"  modals so far: {n}")
             else:
                 errs.append(f"{did}: modal empty")
-            page.keyboard.press("Escape")
-            time.sleep(0.6)
         except Exception as e:
-            errs.append(f"{did}: {e!r}"[:120])
-            try:
-                page.keyboard.press("Escape")
-            except Exception:
-                pass
-            time.sleep(0.5)
+            errs.append(f"{did}: {e!r}"[:110])
     if log:
         log(f"detail modals harvested: {n} | errors: {len(errs)}")
         for e in errs[:5]:
