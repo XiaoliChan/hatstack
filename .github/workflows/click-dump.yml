@@ -1,0 +1,74 @@
+name: Click Dump
+
+# One-off diagnostic: render the us-26 schedule, click the first session,
+# dump the post-click DOM so the slide-extraction can be written against
+# the real clicked-state markup.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Playwright
+        run: |
+          pip install playwright
+          playwright install chromium --with-deps
+      - name: Render, click, dump
+        run: |
+          python - <<'PY'
+          import time
+          from playwright.sync_api import sync_playwright
+
+          UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+          URL = "https://www.blackhat.com/us-26/briefings/schedule/index.html"
+
+          with sync_playwright() as p:
+              browser = p.chromium.launch(args=["--no-sandbox"])
+              page = browser.new_context(user_agent=UA).new_page()
+              # clear challenge
+              for i in range(6):
+                  try:
+                      page.goto(URL, timeout=60000, wait_until="domcontentloaded")
+                  except Exception as e:
+                      print("goto err", repr(e)[:80])
+                  time.sleep(10)
+                  t = page.title()
+                  print("try", i, "title:", t[:60])
+                  if "moment" not in t.lower() and "attention" not in t.lower():
+                      break
+                  time.sleep(15)
+              pdfs_before = page.eval_on_selector_all("a[href$='.pdf']", "els => els.map(e => e.href)")
+              print("pdfs before:", len(pdfs_before))
+              # find first session link
+              link = page.query_selector("[itemprop=summary] a[data-id], a.sd_link[data-id]")
+              if not link:
+                  link = page.query_selector("[itemprop=summary] a[href^='#']")
+              print("first link found:", bool(link))
+              if link:
+                  print("link text:", (link.get_text(" ", strip=True) or "")[:60])
+                  print("link attrs:", link.evaluate("e => JSON.stringify({id: e.id, dataId: e.getAttribute('data-id'), href: e.getAttribute('href'), cls: e.className})"))
+                  link.click()
+                  time.sleep(4)
+                  pdfs_after = page.eval_on_selector_all("a[href$='.pdf']", "els => els.map(e => e.href)")
+                  print("pdfs after click:", len(pdfs_after), "new:", [u for u in pdfs_after if u not in pdfs_before][:4])
+                  # what containers appeared?
+                  for sel in ["#cal_detail_" , ".session-detail-display", ".session-detail", "[class*=detail]"]:
+                      print(f"  {sel!r}: {page.locator(sel).count()}")
+                  html = page.content()
+                  open("/tmp/post-click.html", "w", encoding="utf-8").write(html)
+                  print("dumped:", len(html))
+              browser.close()
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: us26-click-dump
+          path: /tmp/post-click.html
