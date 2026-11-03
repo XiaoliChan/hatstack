@@ -7,6 +7,7 @@ OWN sessions.json XHR (our own in-page requests are blocked — see probe log).
 from __future__ import annotations
 
 import json
+import re
 import random
 import time
 
@@ -180,6 +181,18 @@ def _capture_legacy(page, url: str, log=None) -> dict | None:
     if log:
         log(f"legacy page {len(html)}B, pdf refs {n_pdfs}")
     if ".pdf" not in html.lower():
+        # 2013-2015 era: listing links per-talk detail pages; the slug parser
+        # lives in wayback.py — reuse it on live HTML too
+        from crawler.wayback import _records_from_detail_links
+
+        m = re.search(r"blackhat\.com/(us|eu|asia)-(\d{2})", url)
+        if m:
+            region, yy = m.group(1), m.group(2)
+            recs = _records_from_detail_links(html, region, 2000 + int(yy))
+            if log:
+                log(f"detail-slug records: {len(recs)}")
+            if recs:
+                return {"status": "ok", "kind": "records", "records": recs}
         return None
     return {"status": "ok", "kind": "legacy", "html": html, "source_url": url}
 
