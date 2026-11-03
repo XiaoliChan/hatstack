@@ -254,7 +254,12 @@ def write_outputs(dataset: dict, per_conf: dict[str, dict[str, dict]], out_dir: 
     atomic_write_json(out_dir / "manifest.json", manifest)
     slim_sessions = [_slim(s) for s in dataset["sessions"]]
     vtag = dataset["version"].replace(":", "")
-    atomic_write_json(out_dir / f"sessions-v{vtag}.json", slim_sessions)
+    sessions_path = out_dir / f"sessions-v{vtag}.json"
+    atomic_write_json(sessions_path, slim_sessions)
+    # prune superseded snapshots — 22 files x 13MB accumulated to 303MB once
+    for old_f in out_dir.glob("sessions-v*.json"):
+        if old_f != sessions_path:
+            old_f.unlink(missing_ok=True)
     return {"dataset": ds_path, "report_md": report_dir / "summary.md",
             "manifest": out_dir / "manifest.json",
             "sessions": out_dir / f"sessions-v{vtag}.json"}

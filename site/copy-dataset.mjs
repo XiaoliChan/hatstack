@@ -1,5 +1,5 @@
 // Copy crawled payloads into the site's public dir before dev/build.
-import { copyFileSync, existsSync, readdirSync } from "node:fs"
+import { copyFileSync, existsSync, readdirSync, unlinkSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -20,6 +20,13 @@ const sessions = existsSync(src)
 if (sessions) {
   copyFileSync(resolve(src, sessions), dst(sessions))
   copied++
+  // prune superseded snapshots from public/
+  for (const f of readdirSync(dst(""))) {
+    if (/^sessions-v.+\.json$/.test(f) && f !== sessions) {
+      unlinkSync(dst(f))
+      console.log(`pruned stale ${f}`)
+    }
+  }
 }
 if (!copied) console.warn(`warning: no payloads found in ${src} — site will show its empty state`)
 else console.log(`copied ${copied} payload file(s)`)

@@ -1,8 +1,10 @@
 site/node_modules/
 site/dist/
 site/public/dataset.json
+site/public/sessions-v*.json
 save/
 __pycache__/
 *.pyc
 .pytest_cache/
 summary.md
+site/README.md
