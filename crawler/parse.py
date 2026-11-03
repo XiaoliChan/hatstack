@@ -296,6 +296,65 @@ def parse_rendered_schedule(event: dict, html: str) -> list[dict]:
         )
     if records:
         return records
+    # us-26 style: itemprop=summary links outside cal_content_Day; detail
+    # sections keyed by session id render below (or after clicking)
+    for a in soup.select("[itemprop=summary] a[data-id], a.sd_link[data-id]"):
+        title = a.get_text(" ", strip=True)
+        if not title or len(title) < 6:
+            continue
+        data_id = a.get("data-id")
+        key = title.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        row = a.find_parent("div") or a
+        speakers = []
+        perf = row.find("[itemprop=performers]") if row else None
+        if perf is None:
+            # siblings of the row div share the performers block
+            parent = a.parent
+            perf = parent and parent.find_next("[itemprop=performers]")
+        if perf:
+            txt = perf.get_text(" ", strip=True)
+            txt = re.sub(r"(Speaker|Contributor)s?\s*:?\s*", "", txt, flags=re.I)
+            txt = re.sub(r"Location\s*:.*$", "", txt)
+            for name in re.split(r"[,;·]|\s{2,}", txt):
+                name = re.sub(r"^(Speaker|Contributor)s?\s*:\s*", "", name.strip(), flags=re.I)
+                name = name.strip()
+                if 3 < len(name) < 50 and not re.search(r"TBD|Tracks|Format", name, re.I):
+                    speakers.append({"name": name, "company": None, "role": None})
+        files = {"slides": None, "whitepaper": None, "tool": None}
+        abstract = ""
+        detail = soup.find(id=f"cal_detail_{data_id}") if data_id else None
+        if detail is None and data_id:
+            detail = soup.find(id=re.compile(re.escape(data_id)))
+        if detail:
+            for a2 in detail.find_all("a", href=True):
+                h = a2["href"]
+                if h.lower().endswith(".pdf"):
+                    if "-wp" in h.rsplit("/", 1)[-1] and not files["whitepaper"]:
+                        files["whitepaper"] = _norm_file_url(h)
+                    elif not files["slides"]:
+                        files["slides"] = _norm_file_url(h)
+                elif not files["slides"] and "slide" in (a2.get_text(" ", strip=True).lower() + h.lower()):
+                    files["slides"] = _norm_file_url(h)
+            desc = detail.find(class_=re.compile("desc|abstract", re.I))
+            if desc:
+                abstract = desc.get_text(" ", strip=True)[:4000]
+        label = event_label(event["region"], event["year"])
+        records.append(
+            {
+                "id": f"{label.lower().replace('-', '')}-{re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')[:60]}",
+                "event": {"region": event["region"], "year": event["year"], "label": label},
+                "title": title,
+                "speakers": speakers[:5],
+                "abstract": abstract,
+                "track": None,
+                "files": files,
+                "video_url": None,
+                "source_url": event.get("source_url"),
+            }
+        )
     for li in soup.select("ul#cal_content_Day li"):
         a = li.find("a", attrs={"href": re.compile("#")})
         if not a:

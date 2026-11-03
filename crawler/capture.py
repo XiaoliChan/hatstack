@@ -175,8 +175,14 @@ def _capture_json(page, url: str, expected_year: int, log=None) -> dict | None:
         except Exception:
             pass
     # some years don't fetch sessions.json via XHR but the page still renders
-    # the schedule from inline data — harvest the rendered DOM instead
-    if rendered > 0:
+    # the schedule from inline data — harvest the rendered DOM instead.
+    # us-26-style pages use different markup (rendered_li==0) but carry
+    # [itemprop=summary] rows — those count too.
+    try:
+        itemprop_links = page.locator("[itemprop=summary] a").count()
+    except Exception:
+        itemprop_links = 0
+    if rendered > 0 or itemprop_links >= 3:
         details_html = harvest_detail_modals(page, log=log)
         html = page.content()
         if details_html:
@@ -195,43 +201,74 @@ def _capture_json(page, url: str, expected_year: int, log=None) -> dict | None:
 
 
 def harvest_detail_modals(page, log=None) -> str:
-    """Click each session link to force its detail modal to render, extract
-    the modal HTML (contains bh_files slides/whitepaper links), return the
-    concatenated fragments keyed by session data-id."""
+    """Click each session link; whatever NEW material links (.pdf / deck hosts)
+    appear belongs to that talk. Inject them as hidden cal_detail_<id>
+    fragments so parse_rendered_schedule picks them up via its normal path."""
+    collect_links = """() => {
+      const seen = new Set();
+      const out = [];
+      for (const a of document.querySelectorAll('[itemprop=summary] a, ul#cal_content_Day a')) {
+        const href = a.getAttribute('href') || '';
+        if (!href.startsWith('#')) continue;
+        const m = href.match(/(\d+)$/);
+        if (!m) continue;
+        const did = a.getAttribute('data-id') || m[1];
+        if (seen.has(did)) continue;
+        seen.add(did);
+        out.push({did, href, sel: `a[data-id="${did}"]`});
+      }
+      return out;
+    }"""
     try:
-        links = page.eval_on_selector_all(
-            "ul#cal_content_Day a.sd_link[data-id], [id^=cal_title_] a[data-id]",
-            "els => els.map(e => ({id: e.getAttribute('data-id'), href: e.getAttribute('href')}))",
-        )
+        links = page.evaluate(collect_links)
     except Exception as e:
         if log:
             log(f"detail link enumeration failed: {e!r}")
         return ""
     if not links:
         return ""
+    material_links_js = """() => Array.from(
+        document.querySelectorAll("a[href$='.pdf'], a[href*='speakerdeck'], a[href*='slideshare']")
+    ).map(a => a.href)"""
+    try:
+        baseline = set(page.evaluate(material_links_js))
+    except Exception:
+        baseline = set()
     out = []
     n = 0
     for l in links:
-        did = l.get("id")
-        anchor = (l.get("href") or "").lstrip("#")
-        if not did:
-            continue
+        did, href = l["did"], l["href"]
         try:
-            page.evaluate(f"location.hash = '#{anchor}'")
-            page.wait_for_selector(f"#cal_detail_{did}", timeout=5000)
-            html = page.evaluate(
-                f"() => {{ const el = document.querySelector('#cal_detail_{did}');"
-                " return el ? el.outerHTML : ''; }}"
+            # tag the link with its id so the saved HTML carries data-id
+            page.evaluate(
+                """([sel, did]) => {
+                  for (const a of document.querySelectorAll(sel + ', a[href="' + sel.slice(9,-2) + '"]')) {}
+                  for (const a of document.querySelectorAll('[itemprop=summary] a, ul#cal_content_Day a')) {
+                    const h = a.getAttribute('href') || '';
+                    const m = h.match(/(\d+)$/);
+                    if (m && m[1] === did) a.setAttribute('data-id', did);
+                  }
+                }""",
+                [f'a[data-id="{did}"]', did],
             )
-            if html:
-                out.append(f'<div id="cal_detail_{did}">{html}</div>')
+            try:
+                page.click(f'a[data-id="{did}"]', timeout=3000)
+            except Exception:
+                page.evaluate(f"location.hash = '#{href.lstrip(chr(35))}'")
+            time.sleep(1.5)
+            current = set(page.evaluate(material_links_js) or [])
+            new_links = [u for u in current if u not in baseline]
+            baseline = baseline | set(current)
+            if new_links:
+                frag = "".join(f'<a href="{u}">material</a>' for u in new_links)
+                out.append(f'<div id="cal_detail_{did}" style="display:none">{frag}</div>')
                 n += 1
             page.evaluate("location.hash = ''")
-            time.sleep(0.4)
+            time.sleep(0.3)
         except Exception:
             continue
     if log:
-        log(f"detail modals harvested: {n}/{len(links)}")
+        log(f"detail harvest (click-diff): {n}/{len(links)} talks yielded materials")
     return "".join(out)
 
 
