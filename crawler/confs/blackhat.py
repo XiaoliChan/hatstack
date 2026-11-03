@@ -68,6 +68,19 @@ def collect(ctx: dict) -> dict[str, dict]:
         else:
             print("wayback inventory unavailable -> generative fallback map")
     inventory = _prepare_inventory(inventory)
+    # the archived archives.html predates the current year — always ensure the
+    # latest editions exist as crawl targets (this is why 2026 vanished in v2)
+    for year in (2025, 2026):
+        for region in ("us", "eu", "asia"):
+            key = f"{region}-{year}"
+            if key not in inventory:
+                cands = ev_mod.url_candidates(region, year)
+                inventory[key] = {
+                    "region": region, "year": year,
+                    "urls": list(cands),
+                    "kinds": {u: "json" if u.endswith("schedule/index.html") else "legacy"
+                              for u in cands},
+                }
     for key, urls in _EXTRA_2026.items():
         if key in inventory:
             for u in urls:

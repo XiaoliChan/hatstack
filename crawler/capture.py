@@ -126,6 +126,21 @@ def _capture_json(page, url: str, expected_year: int, log=None) -> dict | None:
     page.on("response", on_response)
     try:
         time.sleep(12)  # page's own JS fetches sessions.json and renders
+        # direct navigation to a .json URL renders the raw JSON as body text
+        # (title empty) — that IS the data; parse it instead of waiting for XHR
+        if url.lower().endswith(".json"):
+            try:
+                body = page.evaluate("document.body ? document.body.innerText : ''")
+                data = json.loads(body) if body else None
+                if isinstance(data, dict) and data.get("sessions"):
+                    if log:
+                        log(f"direct JSON body: {len(data.get('sessions') or {})} sessions")
+                    return {"status": "ok", "kind": "json", "region": None,
+                            "year": expected_year, "data": data,
+                            "rendered_li": 0, "captured_url": url}
+            except Exception as e:
+                if log:
+                    log(f"direct JSON parse failed: {e!r}")
         rendered = page.locator("ul#cal_content_Day li").count()
         title = page.title()
         if log:
