@@ -118,18 +118,28 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # fetch + reset --soft: keep the merged artifact cache in the working
-          # tree while re-pointing HEAD at remote main, then rebuild the fully
-          # cache-derived dataset on top. No rebase of dirty trees can ever
-          # fail, and races just retry (fetch moves, rebuild, push again).
-          build_and_push() {
+          # reset --hard to remote FIRST (working tree + index both move), then
+          # re-merge this run's artifacts and rebuild. reset --soft was the
+          # bug: it kept the stale checkout tree, so `git add crawler/cache/`
+          # committed old cache files over newer remote ones (three regressions).
+          merge_artifacts() {
+            mkdir -p crawler/cache
+            for d in /tmp/artifacts/cache-*; do
+              name="${d##*/cache-}"
+              mkdir -p "crawler/cache/$name"
+              cp -r "$d"/. "crawler/cache/$name/"
+            done
+          }
+          for i in 1 2 3 4; do
             git fetch -q origin main
-            git reset -q --soft origin/main
+            git reset -q --hard origin/main
+            merge_artifacts
             python -u -m crawler crawl --use-cache --out dataset
             git add dataset/ crawler/cache/
-            if git diff --cached --quiet; then echo "no dataset changes"; return 0; fi
+            if git diff --cached --quiet; then echo "no dataset changes"; exit 0; fi
             git commit -q -m "chore(data): refresh dataset (${{ github.run_id }})"
-            git push -q origin main
-          }
-          for i in 1 2 3; do build_and_push && exit 0; sleep $((i * 20)); done
+            if git push -q origin main; then exit 0; fi
+            echo "push raced (attempt $i) — retrying"
+            sleep $((i * 20))
+          done
           exit 1
