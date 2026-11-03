@@ -38,6 +38,18 @@ def _prepare_inventory(inventory: dict[str, dict]) -> dict[str, dict]:
     return dict(ev_mod.fallback_events())
 
 
+_EXTRA_2026 = {
+    "eu-2026": [
+        "https://www.blackhat.com/europe/briefings/schedule/sessions.json",
+        "https://www.blackhat.com/europe/briefings/schedule/index.html",
+    ],
+    "us-2026": [
+        "https://www.blackhat.com/usa/briefings/schedule/sessions.json",
+        "https://www.blackhat.com/usa/briefings/schedule/index.html",
+    ],
+}
+
+
 def collect(ctx: dict) -> dict[str, dict]:
     cache_dir: Path = Path(ctx["cache_dir"])
     captures: dict[str, dict] = dict(ctx["cache_read"])
@@ -54,6 +66,12 @@ def collect(ctx: dict) -> dict[str, dict]:
         else:
             print("wayback inventory unavailable -> generative fallback map")
     inventory = _prepare_inventory(inventory)
+    for key, urls in _EXTRA_2026.items():
+        if key in inventory:
+            for u in urls:
+                if u not in inventory[key]["urls"]:
+                    inventory[key]["urls"].insert(0, u)
+                    inventory[key]["kinds"][u] = "json" if "sessions.json" in u else "legacy"
 
     wanted = set(ctx["events"]) if ctx["events"] else None
     todo = []
@@ -103,7 +121,7 @@ def collect(ctx: dict) -> dict[str, dict]:
             for i, (key, event) in enumerate(live_todo):
                 print(f"[{i + 1}/{len(live_todo)}] blackhat/{key} (live) -> {event['urls'][0]}")
                 try:
-                    cap = crawl_event(pw, event)
+                    cap = crawl_event(pw, event, attempts=6 if key in _EXTRA_2026 else 3)
                     _save_cache(cache_dir, key, cap)
                     captures[key] = cap
                     if cap.get("status") == "ok":
