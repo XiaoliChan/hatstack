@@ -2,7 +2,7 @@
 
 | event | status | kind | sessions | note |
 |---|---|---|---|---|
-| usenix-2025 | ok | records | 455 |  |
+| usenix-2025 | failed | - | 0 |  | HTTP 403 for 2025 |
 | usenix-2024 | failed | - | 0 |  | HTTP 403 for 2024 |
 | usenix-2023 | failed | - | 0 |  | HTTP 403 for 2023 |
 | usenix-2022 | failed | - | 0 |  | HTTP 403 for 2022 |
