@@ -46,18 +46,27 @@ jobs:
                   if "moment" not in t.lower() and "attention" not in t.lower():
                       break
                   time.sleep(15)
+              # WAIT for talk rows to actually render (async app, variable timing)
+              rows = 0
+              for w in range(12):
+                  try:
+                      rows = page.locator("[itemprop=summary] a").count()
+                  except Exception:
+                      rows = 0
+                  print(f"wait {w}: rows={rows}")
+                  if rows > 3:
+                      break
+                  time.sleep(5)
+              time.sleep(3)
               pdfs_before = page.eval_on_selector_all("a[href$='.pdf']", "els => els.map(e => e.href)")
-              print("pdfs before:", len(pdfs_before))
-              # find first session link
-              link = page.query_selector("[itemprop=summary] a[data-id], a.sd_link[data-id]")
-              if not link:
-                  link = page.query_selector("[itemprop=summary] a[href^='#']")
+              print("pdfs before rows-loaded:", len(pdfs_before), pdfs_before[:3])
+              link = page.query_selector("[itemprop=summary] a")
               print("first link found:", bool(link))
               if link:
                   print("link text:", (link.get_text(" ", strip=True) or "")[:60])
                   print("link attrs:", link.evaluate("e => JSON.stringify({id: e.id, dataId: e.getAttribute('data-id'), href: e.getAttribute('href'), cls: e.className})"))
                   link.click()
-                  time.sleep(4)
+                  time.sleep(6)
                   pdfs_after = page.eval_on_selector_all("a[href$='.pdf']", "els => els.map(e => e.href)")
                   print("pdfs after click:", len(pdfs_after), "new:", [u for u in pdfs_after if u not in pdfs_before][:4])
                   # what containers appeared?
