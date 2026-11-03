@@ -60,7 +60,15 @@ jobs:
               time.sleep(3)
               pdfs_before = page.eval_on_selector_all("a[href$='.pdf']", "els => els.map(e => e.href)")
               print("pdfs before rows-loaded:", len(pdfs_before), pdfs_before[:3])
-              link = page.query_selector("[itemprop=summary] a")
+              # prefer a REAL talk (skip breakfast/registration noise)
+              link = None
+              for cand in page.query_selector_all("[itemprop=summary] a"):
+                  txt = (cand.inner_text() or "").lower()
+                  if any(k in txt for k in ("seccomp", "kernel", "exploit", "cloud", "ai", "android")):
+                      link = cand
+                      break
+              if not link:
+                  link = page.query_selector("[itemprop=summary] a")
               print("first link found:", bool(link))
               if link:
                   print("link text:", (link.inner_text() or "")[:60])
@@ -69,8 +77,13 @@ jobs:
                   time.sleep(6)
                   pdfs_after = page.eval_on_selector_all("a[href$='.pdf']", "els => els.map(e => e.href)")
                   print("pdfs after click:", len(pdfs_after), "new:", [u for u in pdfs_after if u not in pdfs_before][:4])
-                  # what containers appeared?
-                  for sel in ["#cal_detail_" , ".session-detail-display", ".session-detail", "[class*=detail]"]:
+                  # dump the OPEN modal specifically
+                  modal = page.query_selector("[id^=session_desc_]")
+                  if modal:
+                      mh = modal.evaluate("e => e.outerHTML")
+                      open("/tmp/modal.html", "w", encoding="utf-8").write(mh)
+                      print("modal dumped:", len(mh))
+                  for sel in ["#cal_detail_" , ".session-detail-display", ".session-detail", "[class*=detail]", "[id^=session_desc_]"]:
                       print(f"  {sel!r}: {page.locator(sel).count()}")
                   html = page.content()
                   open("/tmp/post-click.html", "w", encoding="utf-8").write(html)
@@ -80,4 +93,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: us26-click-dump
-          path: /tmp/post-click.html
+          path: |
+            /tmp/post-click.html
+            /tmp/modal.html
