@@ -258,7 +258,9 @@ def _capture_legacy(page, url: str, log=None) -> dict | None:
     n_pdfs = html.lower().count(".pdf")
     if log:
         log(f"legacy page {len(html)}B, pdf refs {n_pdfs}")
-    if ".pdf" not in html.lower():
+    # 2003-2009 schedule tables carry no PDFs — accept the table signature;
+    # the build-time parser dispatch turns it into records
+    if ".pdf" not in html.lower() and "speakers.html#" not in html:
         return None
     return {"status": "ok", "kind": "legacy", "html": html, "source_url": url}
 
