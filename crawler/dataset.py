@@ -37,7 +37,17 @@ def build_records(event_key: str, capture: dict, conference: str = "blackhat") -
     if capture.get("kind") == "json":
         records = parse_event_json(event, capture["data"])
     else:
-        records = parse_legacy_html(event, capture.get("html", ""))
+        from .parse import parse_old_schedule
+
+        html = capture.get("html", "")
+        records = parse_legacy_html(event, html)
+        # 2003-2009 schedule tables: the old-era parser only ran in the
+        # wayback acceptance chain — live/429-detour captures of the same
+        # pages stored as plain legacy html were parsed by the wrong parser
+        if year <= 2009:
+            old = parse_old_schedule(event, html)
+            if len(old) > len(records):
+                records = old
     for r in records:
         r["conference"] = conference
     return records
