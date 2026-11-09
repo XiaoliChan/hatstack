@@ -19,6 +19,8 @@ DESCRIPTION = "Virus Bulletin Conference, since 1991 — the anti-malware indust
 BASE = "https://www.virusbulletin.com/conference"
 FIRST_YEAR = 2002  # 1991-2001 exist only as PDF conference reports, no programme pages
 LAST_YEAR = 2026  # vb2027 is future
+# virtual COVID editions have no programme archive on the site
+UNAVAILABLE = {2020, 2021}
 
 
 def _slug(text: str) -> str:
@@ -112,7 +114,8 @@ def collect(ctx: dict) -> dict[str, dict]:
     wanted = set(ctx["events"]) if ctx["events"] else None
     todo = [
         y for y in range(FIRST_YEAR, LAST_YEAR + 1)
-        if (wanted is None or f"vb-{y}" in wanted)
+        if y not in UNAVAILABLE
+        and (wanted is None or f"vb-{y}" in wanted)
         and not (captures.get(f"vb-{y}", {}).get("status") == "ok" and not ctx["refresh"])
     ]
     print(f"[vb] to crawl: {len(todo)} editions")
