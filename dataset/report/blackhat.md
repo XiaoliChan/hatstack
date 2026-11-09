@@ -66,7 +66,7 @@
 | us-2005 | ok | records | 63 |  | 63 talks from 2003-09 schedule table |
 | asia-2004 | ok | legacy | 12 |  | legacy page 23874B, pdf refs 2 |
 | eu-2004 | ok | records | 21 |  | 21 talks from 2003-09 schedule table |
-| us-2004 | failed | - | 0 |  | all attempts exhausted |
+| us-2004 | ok | records | 58 |  | 58 talks from 2003-09 schedule table |
 | asia-2003 | ok | records | 14 |  | 14 talks from 2003-09 schedule table |
 | eu-2003 | ok | records | 23 |  | 23 talks from 2003-09 schedule table |
 | us-2003 | ok | records | 48 |  | 48 talks from 2003-09 schedule table |
