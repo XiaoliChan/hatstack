@@ -87,6 +87,20 @@ def collect(ctx: dict) -> dict[str, dict]:
                 if u not in entry["urls"]:
                     entry["urls"].insert(0, u)
                     entry["kinds"][u] = "legacy"
+    # us-2013: the IA-served archives.html snapshot drifted and stopped
+    # listing it (Nov 9) — guarantee the key exists so the day-page harvest
+    # in the live section gets a chance to run
+    inventory.setdefault("us-2013", {
+        "region": "us", "year": 2013,
+        "urls": [
+            "https://www.blackhat.com/us-13/briefings.html",
+            "https://www.blackhat.com/us-13/archives.html",
+        ],
+        "kinds": {
+            "https://www.blackhat.com/us-13/briefings.html": "legacy",
+            "https://www.blackhat.com/us-13/archives.html": "legacy",
+        },
+    })
     # the archived archives.html predates the current year — always ensure the
     # latest editions exist as crawl targets (this is why 2026 vanished in v2)
     for year in (2025, 2026):
