@@ -1,6 +1,6 @@
 import pytest
 
-from crawler.parse import parse_old_schedule
+from crawler.parse import parse_old_schedule, parse_us13_schedule
 
 # 2003-2007 layout (pattern A): innermost talk cell with a textday* title <p>
 # plus speaker anchors into speakers.html#<name>; wrapper tds nest whole-day
@@ -72,3 +72,30 @@ def test_old_schedule_pattern_b_fields():
 def test_old_schedule_breaks_filtered():
     recs = parse_old_schedule({"region": "us", "year": 2005, "source_url": "x"}, PATTERN_A)
     assert not any(r["title"].lower().startswith("break") for r in recs)
+
+
+US13_DAY = """<html><body>
+<div class="schedule-time"><h3>0900</h3></div>
+<div class="schedule-info"><h3 class="schedule-info-description">
+  <a href="../briefings.html#Alexander" class="schedule-briefing-title">Keynote Speaker: General Keith B. Alexander</a></h3></div>
+<div class="schedule-tracks"><div class="schedule-track-col"><div class="schedule-track">
+  <a href="../briefings.html#Young" class="schedule-briefing-title">Mainframes: The Past Will Come to <span class="more-briefing-title">Haunt You</span></a>
+  <a href="../speakers/Philip-Young.html" class="schedule-briefing-speaker">Philip Young</a> &amp;
+  <a href="../speakers/Chick.html" class="schedule-briefing-speaker">Colin Chick</a>
+  <br><span class="schedule-briefing-room">Room 310</span>
+</div></div></div>
+</body></html>"""
+
+
+def test_us13_schedule_extracts_title_and_speakers():
+    recs = parse_us13_schedule({"region": "us", "year": 2013, "source_url": "x"}, US13_DAY)
+    assert len(recs) == 2
+    main = next(r for r in recs if "Mainframes" in r["title"])
+    # title continues inside the nested span and must be joined
+    assert main["title"] == "Mainframes: The Past Will Come to Haunt You"
+    assert [s["name"] for s in main["speakers"]] == ["Philip Young", "Colin Chick"]
+    assert main["id"].startswith("us13-")
+
+
+def test_us13_schedule_wrong_page_guard():
+    assert parse_us13_schedule({"region": "us", "year": 2013}, "<html>other era</html>") == []

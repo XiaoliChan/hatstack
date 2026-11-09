@@ -138,7 +138,15 @@ def old_schedule_urls(region: str, year: int) -> list[str] | None:
     drifted (bh-usa-06-schedule.html vs bh-us-06-…; asia-04 used bh-jp-04-…
     inside the bh-asia-04/ folder), so emit both long and short variants.
     Asia has no archived schedule pages after 2005."""
+    if region == "asia" and year in (2006, 2007):
+        # Japan-era microsites; EN schedule preferred over the JP mirror
+        yy = f"{year:02d}"
+        return [
+            f"https://www.blackhat.com/html/bh-japan-{yy}/bh-jp-{yy}-en-schedule.html",
+            f"https://www.blackhat.com/html/bh-japan-{yy}/bh-jp-{yy}-schedule.html",
+        ]
     long_r = {"us": "usa", "eu": "europe", "asia": "asia"}[region]
+    # asia 2008+ (and everything else outside 03-09) has no IA snapshots
     if year < 2003 or year > 2009 or (region == "asia" and year > 2005):
         return None
     yy = f"{year:02d}"
@@ -158,6 +166,8 @@ def fallback_events() -> dict[str, dict]:
         for region in ("us", "eu", "asia"):
             if region == "asia" and year == 2026:
                 continue  # asia-26 not yet listed; will come from inventory
+            if region == "asia" and year == 2013:
+                continue  # official archives list no asia-2013 (first ran 2014)
             urls = url_candidates(region, year)
             events[f"{region}-{year}"] = {
                 "region": region,

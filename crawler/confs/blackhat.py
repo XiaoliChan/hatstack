@@ -146,13 +146,52 @@ def collect(ctx: dict) -> dict[str, dict]:
     wb_missing = [k for k, e in wb_todo if captures.get(k, {}).get("status") != "ok"]
 
     live_todo = live_todo + [(k, e) for k, e in wb_todo if k in set(wb_missing)]
+
     if live_todo:
         from playwright.sync_api import sync_playwright
 
         from crawler.capture import crawl_event, pace
 
         with sync_playwright() as pw:
+            # us-2013: agenda lives on per-day schedule pages whose links
+            # point to speaker pages, not PDFs — generic legacy acceptance
+            # rejects them, so harvest both days and store pre-parsed records
+            from crawler.parse import parse_us13_schedule
+
+            _US13_DAYS = [
+                "https://www.blackhat.com/us-13/schedule/briefings-31.html",
+                "https://www.blackhat.com/us-13/schedule/briefings-01.html",
+            ]
+            if "us-2013" in {k for k, _ in live_todo}:
+                recs13, trace13 = [], []
+                for du in _US13_DAYS:
+                    cap = crawl_event(
+                        pw,
+                        {"region": "us", "year": 2013, "urls": [du], "kinds": {du: "legacy"}},
+                        attempts=3,
+                    )
+                    trace13 += cap.get("meta", {}).get("trace", [])
+                    if cap.get("status") == "ok" and cap.get("html"):
+                        recs13 += parse_us13_schedule(
+                            {"region": "us", "year": 2013, "source_url": du}, cap["html"]
+                        )
+                if recs13:
+                    seen_ids = set()
+                    uniq13 = [r for r in recs13 if not (r["id"] in seen_ids or seen_ids.add(r["id"]))]
+                    cap13 = {
+                        "status": "ok", "kind": "records", "region": "us", "year": 2013,
+                        "records": uniq13,
+                        "meta": {"source": "live", "url": _US13_DAYS[0], "kind": "records",
+                                 "title": "us-13 schedule days", "trace": trace13},
+                    }
+                    _save_cache(cache_dir, "us-2013", cap13)
+                    captures["us-2013"] = cap13
+                    print(f"    ok: us-2013 records ({len(uniq13)})")
+                else:
+                    print("    us-2013: no records from day pages")
             for i, (key, event) in enumerate(live_todo):
+                if key == "us-2013":
+                    continue  # harvested above from per-day schedule pages
                 print(f"[{i + 1}/{len(live_todo)}] blackhat/{key} (live) -> {event['urls'][0]}")
                 try:
                     cap = crawl_event(pw, event, attempts=6 if key in _EXTRA_2026 else 3)

@@ -341,6 +341,51 @@ def parse_old_schedule(event: dict, html: str) -> list[dict]:
     return records
 
 
+def parse_us13_schedule(event: dict, html: str) -> list[dict]:
+    """us-13 schedule day pages: a.schedule-briefing-title carries the talk
+    title (text may continue in a nested span); speakers are
+    a.schedule-briefing-speaker anchors between this title and the next.
+    Breaks/rooms are plain text and never match the title class."""
+    if "schedule-briefing-title" not in html:
+        return []
+    region, year = event["region"], event["year"]
+    label = event_label(region, year)
+    soup = BeautifulSoup(html, "html.parser")
+    titles = soup.find_all("a", class_="schedule-briefing-title")
+    records: list[dict] = []
+    seen: set[str] = set()
+    for i, a in enumerate(titles):
+        nxt = titles[i + 1] if i + 1 < len(titles) else None
+        speakers: list[dict] = []
+        for el in a.next_elements:
+            if el is nxt:
+                break
+            cls = getattr(el, "get", lambda *_: [])("class") or []
+            if "schedule-briefing-speaker" in cls:
+                name = el.get_text(" ", strip=True)
+                if 2 < len(name) < 40:
+                    speakers.append({"name": name, "company": None, "role": None})
+        title = re.sub(r"\s+", " ", a.get_text(" ", strip=True))
+        key = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        records.append(
+            {
+                "id": f"{region}{year % 100:02d}-{key[:60]}",
+                "event": {"region": region, "year": year, "label": label},
+                "title": title,
+                "speakers": speakers[:5],
+                "abstract": "",
+                "track": None,
+                "files": {"slides": None, "whitepaper": None, "tool": None},
+                "video_url": None,
+                "source_url": event.get("source_url"),
+            }
+        )
+    return records
+
+
 def parse_rendered_schedule(event: dict, html: str) -> list[dict]:
     """Rendered Black Hat schedule DOM (no-XHR years): li rows under
     ul#cal_content_Day carry title/speakers; detail modals (when present)
