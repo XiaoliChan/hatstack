@@ -57,14 +57,19 @@
 | us-2008 | ok | legacy | 74 |  | legacy page 104496B, pdf refs 74 |
 | asia-2007 | failed | - | 0 |  | all attempts exhausted |
 | eu-2007 | ok | legacy | 2 |  | legacy page 25780B, pdf refs 4 |
+| us-2007 | ok | records | 92 |  | 92 talks from 2003-09 schedule table |
 | asia-2006 | failed | - | 0 |  | all attempts exhausted |
 | eu-2006 | ok | legacy | 3 |  | legacy page 22344B, pdf refs 6 |
-| asia-2005 | failed | - | 0 |  | all attempts exhausted |
-| eu-2005 | failed | - | 0 |  | no usable wayback capture |
-| asia-2004 | failed | - | 0 |  | all attempts exhausted |
-| eu-2004 | failed | - | 0 |  | no usable wayback capture |
-| asia-2003 | failed | - | 0 |  | all attempts exhausted |
-| eu-2003 | failed | - | 0 |  | no usable wayback capture |
+| us-2006 | ok | records | 84 |  | 84 talks from 2003-09 schedule table |
+| asia-2005 | ok | legacy | 1 |  | got 25752B page via web.archive.org: https://www.blackhat.com/html/bh-asia-05/bh-asia-05-schedule.html (pdfs: 1) |
+| eu-2005 | ok | records | 24 |  | 24 talks from 2003-09 schedule table |
+| us-2005 | ok | records | 63 |  | 63 talks from 2003-09 schedule table |
+| asia-2004 | ok | legacy | 1 |  | legacy page 23874B, pdf refs 2 |
+| eu-2004 | ok | records | 21 |  | 21 talks from 2003-09 schedule table |
+| us-2004 | failed | - | 0 |  | all attempts exhausted |
+| asia-2003 | ok | legacy | 2 |  | got 21021B page via web.archive.org: https://www.blackhat.com/html/bh-asia-03/bh-asia-03-index.html (pdfs: 4) |
+| eu-2003 | failed | - | 0 |  | all attempts exhausted |
+| us-2003 | ok | records | 48 |  | 48 talks from 2003-09 schedule table |
 | asia-2002 | failed | - | 0 |  | no usable wayback capture |
 | eu-2002 | failed | - | 0 |  | all attempts exhausted |
 | asia-2001 | failed | - | 0 |  | no usable wayback capture |
