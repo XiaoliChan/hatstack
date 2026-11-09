@@ -132,6 +132,25 @@ def merge_candidates(inventory: dict[str, dict]) -> dict[str, dict]:
     return inventory
 
 
+def old_schedule_urls(region: str, year: int) -> list[str] | None:
+    """2003-2009 era: per-event microsites under /html/bh-<region>-<yy>/
+    with a schedule table linking speakers.html# anchors. File naming
+    drifted (bh-usa-06-schedule.html vs bh-us-06-…; asia-04 used bh-jp-04-…
+    inside the bh-asia-04/ folder), so emit both long and short variants.
+    Asia has no archived schedule pages after 2005."""
+    long_r = {"us": "usa", "eu": "europe", "asia": "asia"}[region]
+    if year < 2003 or year > 2009 or (region == "asia" and year > 2005):
+        return None
+    yy = f"{year:02d}"
+    folder = f"https://www.blackhat.com/html/bh-{long_r}-{yy}"
+    out = []
+    for stem in (long_r, {"us": "us", "eu": "eu", "asia": "jp"}[region]):
+        u = f"{folder}/bh-{stem}-{yy}-schedule.html"
+        if u not in out:
+            out.append(u)
+    return out
+
+
 def fallback_events() -> dict[str, dict]:
     """Generative mainline map when archives.html is unreachable."""
     events: dict[str, dict] = {}

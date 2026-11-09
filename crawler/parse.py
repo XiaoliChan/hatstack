@@ -229,6 +229,118 @@ def parse_legacy_html(event: dict, html: str) -> list[dict]:
     return records
 
 
+_NON_PERSON = re.compile(
+    r"president|officer|\bceo\b|\bcio\b|\bciso\b|director|founder|manager|chief\b"
+    r"|inc\b|corp|llc|ltd|gmbh|labs?|technolog|security|solutions|university"
+    r"|in-?q-?tel|department|\bagent|special|professional|evangelist|architect"
+    r"|researcher|consultant|engineer|analyst|trainer|instructor|professor",
+    re.I,
+)
+
+
+def _person_candidates(txt: str) -> list[dict]:
+    """Split an anchor/label text into person-name dicts; comma chunks that
+    look like job titles or orgs are dropped (old pages embed
+    'Name, President and CEO, In-Q-Tel' in speaker anchors)."""
+    out: list[dict] = []
+    for chunk in re.split(r"\s*&\s*|,|;|\s+and\s+", txt):
+        chunk = chunk.strip(" .")
+        words = chunk.split()
+        if not (2 < len(chunk) < 40) or not (1 <= len(words) <= 4) or any(ch.isdigit() for ch in chunk):
+            continue
+        if _NON_PERSON.search(chunk) and len(words) > 1:
+            continue
+        out.append({"name": chunk, "company": None, "role": None})
+    return out
+
+
+def parse_old_schedule(event: dict, html: str) -> list[dict]:
+    """2003-2009 schedule pages. Two layouts:
+    A) 2003-2007 nested tables — innermost talk cells pair a title <p>
+       (textday*-classed) with speaker anchors into *speakers.html#<name>;
+    B) 2008-2009 div panels — the anchor itself carries the talk title and
+       the speaker sits in a trailing <span>/plain text after " - ".
+    Returns [] when the page has no speakers.html# anchors (wrong-page
+    guard, e.g. pre-conference placeholder snapshots)."""
+    if "speakers.html#" not in html:
+        return []
+    region, year = event["region"], event["year"]
+    label = event_label(region, year)
+    soup = BeautifulSoup(html, "html.parser")
+    anchor_re = re.compile(r"speakers\.html#")
+    records: list[dict] = []
+    seen: set[str] = set()
+
+    def _push(title: str, speakers: list[dict], src: str) -> None:
+        title = re.sub(r"\s+", " ", title).strip()
+        if len(title) < 8 or re.search(
+            r"\bbreak\b|lunch|registration|reception|\bparty\b|sponsored by|location & times",
+            title,
+            re.I,
+        ):
+            return
+        key = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+        if not key or key in seen:
+            return
+        seen.add(key)
+        records.append(
+            {
+                "id": f"{region}{year % 100:02d}-{key[:60]}",
+                "event": {"region": region, "year": year, "label": label},
+                "title": title,
+                "speakers": speakers[:5],
+                "abstract": "",
+                "track": None,
+                "files": {"slides": None, "whitepaper": None, "tool": None},
+                "video_url": None,
+                "source_url": event.get("source_url"),
+            }
+        )
+
+    # Pattern A — innermost tds only; wrapper tds (whole-day grids) contain
+    # nested tds and would glob every talk of the day into one record
+    for td in soup.find_all("td"):
+        if td.find_all("td"):
+            continue
+        anchors = td.find_all("a", href=anchor_re)
+        if not anchors:
+            continue
+        title = ""
+        for p in td.find_all("p"):
+            if p.find("a"):
+                continue
+            t = p.get_text(" ", strip=True)
+            if len(t) > len(title) and not t[:1].isdigit() and len(t) >= 8:
+                title = t
+        if not title:
+            continue
+        speakers: list[dict] = []
+        for a in anchors:
+            speakers.extend(_person_candidates(a.get_text(" ", strip=True)))
+        dedup = {s["name"]: s for s in speakers}
+        _push(title, list(dedup.values()), str(td)[:60])
+
+    # Pattern B — h-heading/list panels where the anchor is the title
+    for h in soup.find_all(["h5", "h4", "h3", "li"]):
+        a = h.find("a", href=anchor_re)
+        if a is None:
+            continue
+        title = a.get_text(" ", strip=True)
+        if len(title) < 8 or title[:1].isdigit():
+            continue
+        speaker_txt = ""
+        for sp in h.find_all("span"):
+            t = sp.get_text(" ", strip=True)
+            if t and t.lower() != title.lower() and len(t) < 80:
+                speaker_txt += ", " + t
+        if not speaker_txt:
+            m = re.search(r"-\s*([^–-]{3,80})$", h.get_text(" ", strip=True))
+            speaker_txt = m.group(1) if m else ""
+        _push(title, _person_candidates(speaker_txt), str(h)[:60])
+
+    return records
+
+
 def parse_rendered_schedule(event: dict, html: str) -> list[dict]:
     """Rendered Black Hat schedule DOM (no-XHR years): li rows under
     ul#cal_content_Day carry title/speakers; detail modals (when present)

@@ -185,6 +185,23 @@ def wayback_event(event: dict) -> dict:
                 "meta": {"source": "wayback", "url": url, "kind": "legacy",
                          "title": f"wayback {ts}", "trace": trace},
             }
+        # 2003-2009 schedule tables: title <p> + speakers.html# anchors,
+        # no PDFs on the page — parse the grid directly
+        if year <= 2009:
+            from .parse import parse_old_schedule
+
+            old = parse_old_schedule(event, html)
+            if old:
+                say(f"{len(old)} talks from 2003-09 schedule table")
+                return {
+                    "status": "ok",
+                    "kind": "records",
+                    "region": event["region"],
+                    "year": year,
+                    "records": old,
+                    "meta": {"source": "wayback", "url": url, "kind": "records",
+                             "title": f"wayback {ts}", "trace": trace},
+                }
         # 2013-2014 era: listing pages link per-talk detail pages instead of
         # direct PDFs ("us-15-Gaddam-Securing-Your-Big-Data.html"). Derive
         # speaker+title from the slug — zero extra requests.

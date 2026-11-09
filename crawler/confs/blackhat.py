@@ -68,6 +68,25 @@ def collect(ctx: dict) -> dict[str, dict]:
         else:
             print("wayback inventory unavailable -> generative fallback map")
     inventory = _prepare_inventory(inventory)
+    # 2003-2009 schedule-table microsites: the inventory (archived
+    # archives.html) links the /archive/ canonical paths that have no IA
+    # snapshots — inject the real archived schedule.html URLs so wayback
+    # can find them regardless of what the inventory says
+    from crawler.events import old_schedule_urls
+
+    for reg in ("us", "eu", "asia"):
+        for yr in range(2003, 2010):
+            urls = old_schedule_urls(reg, yr)
+            if not urls:
+                continue
+            key = f"{reg}-{yr}"
+            entry = inventory.setdefault(
+                key, {"region": reg, "year": yr, "urls": [], "kinds": {}}
+            )
+            for u in urls:
+                if u not in entry["urls"]:
+                    entry["urls"].insert(0, u)
+                    entry["kinds"][u] = "legacy"
     # the archived archives.html predates the current year — always ensure the
     # latest editions exist as crawl targets (this is why 2026 vanished in v2)
     for year in (2025, 2026):
