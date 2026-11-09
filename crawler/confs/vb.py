@@ -123,36 +123,39 @@ def collect(ctx: dict) -> dict[str, dict]:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as pw:
-        page = _new_page(pw)
-        for i, year in enumerate(todo):
-            key = f"vb-{year}"
-            # 1991-1999 editions use two-digit paths (vb95), 2000+ four
-            tag = year % 100 if year < 2000 else year
-            url = f"{BASE}/vb{tag}/programme/"
-            trace: list[str] = []
-            try:
-                page.goto(url, timeout=45000, wait_until="domcontentloaded")
-                ok = clear_challenge(page, url, log=lambda s: trace.append(s))
-                title = page.title()
-                trace.append(f"title='{title}'")
-                html = page.content() if ok else ""
-                recs = parse_programme(year, html) if html else []
-                trace.append(f"programme {len(html)}B -> {len(recs)} talks")
-                cap = {
-                    "status": "ok" if recs else "failed",
-                    "kind": "records",
-                    "records": recs,
-                    "meta": {"source": url, "url": url, "kind": "records",
-                             "title": title, "trace": trace},
-                }
-            except Exception as e:
-                trace.append(f"exception: {e!r}")
-                cap = {"status": "failed", "kind": "records", "records": [],
-                       "meta": {"source": url, "url": url, "trace": trace}}
-            atomic_write_json(cache_dir / f"{key}.json", cap)
-            captures[key] = cap
-            print(f"    [{i + 1}/{len(todo)}] {key}: "
-                  f"{'ok' if cap['status'] == 'ok' else 'FAILED'} ({len(cap['records'])} talks)")
-            if i + 1 < len(todo):
-                time.sleep(20 + (year % 10))  # stay under Cloudflare's radar
+        browser, _ctx, page = _new_page(pw)
+        try:
+            for i, year in enumerate(todo):
+                key = f"vb-{year}"
+                # 1991-1999 editions use two-digit paths (vb95), 2000+ four
+                tag = year % 100 if year < 2000 else year
+                url = f"{BASE}/vb{tag}/programme/"
+                trace: list[str] = []
+                try:
+                    page.goto(url, timeout=45000, wait_until="domcontentloaded")
+                    ok = clear_challenge(page, url, log=lambda s: trace.append(s))
+                    title = page.title()
+                    trace.append(f"title='{title}'")
+                    html = page.content() if ok else ""
+                    recs = parse_programme(year, html) if html else []
+                    trace.append(f"programme {len(html)}B -> {len(recs)} talks")
+                    cap = {
+                        "status": "ok" if recs else "failed",
+                        "kind": "records",
+                        "records": recs,
+                        "meta": {"source": url, "url": url, "kind": "records",
+                                 "title": title, "trace": trace},
+                    }
+                except Exception as e:
+                    trace.append(f"exception: {e!r}")
+                    cap = {"status": "failed", "kind": "records", "records": [],
+                           "meta": {"source": url, "url": url, "trace": trace}}
+                atomic_write_json(cache_dir / f"{key}.json", cap)
+                captures[key] = cap
+                print(f"    [{i + 1}/{len(todo)}] {key}: "
+                      f"{'ok' if cap['status'] == 'ok' else 'FAILED'} ({len(cap['records'])} talks)")
+                if i + 1 < len(todo):
+                    time.sleep(20 + (year % 10))  # stay under Cloudflare's radar
+        finally:
+            browser.close()
     return captures
