@@ -1,6 +1,6 @@
 # Crawl completeness report
 
-- dataset version: 2026-11-09T03:33:25Z
+- dataset version: 2026-11-09T03:50:59Z
 - total sessions: 12789
 - sessions with slides: 4703
 - sessions with whitepaper: 686
@@ -352,4 +352,34 @@
 | mosec-2017 | failed | - | 0 |  | no capture for 2017 |
 | mosec-2016 | failed | - | 0 |  | no capture for 2016 |
 
-failed events: blackhat/us-2014, blackhat/asia-2013, blackhat/us-2013, blackhat/asia-2008, blackhat/asia-2007, blackhat/asia-2006, blackhat/asia-2005, blackhat/eu-2005, blackhat/asia-2004, blackhat/eu-2004, blackhat/asia-2003, blackhat/eu-2003, blackhat/asia-2002, blackhat/eu-2002, blackhat/asia-2001, blackhat/eu-2001, blackhat/asia-2000, blackhat/eu-2000, blackhat/us-1999, blackhat/us-1998, blackhat/us-1997, defcon/dc-28, defcon/dc-14, defcon/dc-9, defcon/dc-8, defcon/dc-7, defcon/dc-6, defcon/dc-5, defcon/dc-4, defcon/dc-3, defcon/dc-2, defcon/dc-1, usenix/usenix-2025, usenix/usenix-2024, usenix/usenix-2023, usenix/usenix-2022, usenix/usenix-2021, usenix/usenix-2020, usenix/usenix-2019, usenix/usenix-2018, usenix/usenix-2017, usenix/usenix-2016, usenix/usenix-2015, redteamvillage/all, hitcon/hitcon-2025, hitcon/hitcon-2024, hitcon/hitcon-2023, hitcon/hitcon-2022, hitcon/hitcon-2021, hitcon/hitcon-2020, hitcon/hitcon-2019, hitcon/hitcon-2018, hitcon/hitcon-2017, hitcon/hitcon-2016, pretalx/sec-t-2018, pretalx/sec-t-2019, pretalx/sec-t-2020, pretalx/sec-t-2021, pretalx/sec-t-2022, pretalx/sec-t-2023, nullcon/all, mosec/mosec-2019, mosec/mosec-2018, mosec/mosec-2017, mosec/mosec-2016
+## vb
+
+| event | status | kind | sessions | note |
+|---|---|---|---|---|
+| vb-2026 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2025 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2024 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2023 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2022 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2021 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2020 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2019 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2018 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2017 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2016 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2015 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2014 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2013 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2012 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2011 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2010 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2009 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2008 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2007 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2006 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2005 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2004 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2003 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2002 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+
+failed events: blackhat/us-2014, blackhat/asia-2013, blackhat/us-2013, blackhat/asia-2008, blackhat/asia-2007, blackhat/asia-2006, blackhat/asia-2005, blackhat/eu-2005, blackhat/asia-2004, blackhat/eu-2004, blackhat/asia-2003, blackhat/eu-2003, blackhat/asia-2002, blackhat/eu-2002, blackhat/asia-2001, blackhat/eu-2001, blackhat/asia-2000, blackhat/eu-2000, blackhat/us-1999, blackhat/us-1998, blackhat/us-1997, defcon/dc-28, defcon/dc-14, defcon/dc-9, defcon/dc-8, defcon/dc-7, defcon/dc-6, defcon/dc-5, defcon/dc-4, defcon/dc-3, defcon/dc-2, defcon/dc-1, usenix/usenix-2025, usenix/usenix-2024, usenix/usenix-2023, usenix/usenix-2022, usenix/usenix-2021, usenix/usenix-2020, usenix/usenix-2019, usenix/usenix-2018, usenix/usenix-2017, usenix/usenix-2016, usenix/usenix-2015, redteamvillage/all, hitcon/hitcon-2025, hitcon/hitcon-2024, hitcon/hitcon-2023, hitcon/hitcon-2022, hitcon/hitcon-2021, hitcon/hitcon-2020, hitcon/hitcon-2019, hitcon/hitcon-2018, hitcon/hitcon-2017, hitcon/hitcon-2016, pretalx/sec-t-2018, pretalx/sec-t-2019, pretalx/sec-t-2020, pretalx/sec-t-2021, pretalx/sec-t-2022, pretalx/sec-t-2023, nullcon/all, mosec/mosec-2019, mosec/mosec-2018, mosec/mosec-2017, mosec/mosec-2016, vb/vb-2026, vb/vb-2025, vb/vb-2024, vb/vb-2023, vb/vb-2022, vb/vb-2021, vb/vb-2020, vb/vb-2019, vb/vb-2018, vb/vb-2017, vb/vb-2016, vb/vb-2015, vb/vb-2014, vb/vb-2013, vb/vb-2012, vb/vb-2011, vb/vb-2010, vb/vb-2009, vb/vb-2008, vb/vb-2007, vb/vb-2006, vb/vb-2005, vb/vb-2004, vb/vb-2003, vb/vb-2002

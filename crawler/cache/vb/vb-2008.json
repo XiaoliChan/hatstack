@@ -1,0 +1,1 @@
+{"status": "failed", "kind": "records", "records": [], "meta": {"source": "https://www.virusbulletin.com/conference/vb2008/programme/", "url": "https://www.virusbulletin.com/conference/vb2008/programme/", "trace": ["exception: AttributeError(\"'tuple' object has no attribute 'goto'\")"]}}
