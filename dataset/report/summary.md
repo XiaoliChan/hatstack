@@ -1,7 +1,7 @@
 # Crawl completeness report
 
-- dataset version: 2026-11-09T03:52:58Z
-- total sessions: 12789
+- dataset version: 2026-11-09T04:09:49Z
+- total sessions: 14056
 - sessions with slides: 4703
 - sessions with whitepaper: 686
 - sessions with tool: 34
@@ -356,30 +356,30 @@
 
 | event | status | kind | sessions | note |
 |---|---|---|---|---|
-| vb-2026 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2025 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2024 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2023 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2022 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2021 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2020 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2019 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2018 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2017 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2016 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2015 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2014 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2013 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2012 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2011 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2010 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2009 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2008 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2007 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2006 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2005 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2004 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2003 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
-| vb-2002 | failed | records | 0 |  | exception: AttributeError("'tuple' object has no attribute 'goto'") |
+| vb-2026 | ok | records | 71 |  | programme 48497B -> 71 talks |
+| vb-2025 | ok | records | 70 |  | programme 49053B -> 70 talks |
+| vb-2024 | ok | records | 72 |  | programme 47326B -> 72 talks |
+| vb-2023 | ok | records | 73 |  | programme 46013B -> 73 talks |
+| vb-2022 | ok | records | 45 |  | programme 36807B -> 45 talks |
+| vb-2021 | failed | records | 0 |  | programme 0B -> 0 talks |
+| vb-2020 | failed | records | 0 |  | programme 16233B -> 0 talks |
+| vb-2019 | ok | records | 71 |  | programme 81190B -> 71 talks |
+| vb-2018 | ok | records | 62 |  | programme 74290B -> 62 talks |
+| vb-2017 | ok | records | 64 |  | programme 67072B -> 64 talks |
+| vb-2016 | ok | records | 63 |  | programme 64662B -> 63 talks |
+| vb-2015 | ok | records | 62 |  | programme 67881B -> 62 talks |
+| vb-2014 | ok | records | 55 |  | programme 37727B -> 55 talks |
+| vb-2013 | ok | records | 58 |  | programme 35769B -> 58 talks |
+| vb-2012 | ok | records | 55 |  | programme 34382B -> 55 talks |
+| vb-2011 | ok | records | 56 |  | programme 32270B -> 56 talks |
+| vb-2010 | ok | records | 54 |  | programme 33640B -> 54 talks |
+| vb-2009 | ok | records | 54 |  | programme 33812B -> 54 talks |
+| vb-2008 | ok | records | 50 |  | programme 32923B -> 50 talks |
+| vb-2007 | ok | records | 50 |  | programme 32545B -> 50 talks |
+| vb-2006 | ok | records | 44 |  | programme 30562B -> 44 talks |
+| vb-2005 | ok | records | 42 |  | programme 29108B -> 42 talks |
+| vb-2004 | ok | records | 33 |  | programme 26650B -> 33 talks |
+| vb-2003 | ok | records | 30 |  | programme 24491B -> 30 talks |
+| vb-2002 | ok | records | 33 |  | programme 26106B -> 33 talks |
 
-failed events: blackhat/us-2014, blackhat/asia-2013, blackhat/us-2013, blackhat/asia-2008, blackhat/asia-2007, blackhat/asia-2006, blackhat/asia-2005, blackhat/eu-2005, blackhat/asia-2004, blackhat/eu-2004, blackhat/asia-2003, blackhat/eu-2003, blackhat/asia-2002, blackhat/eu-2002, blackhat/asia-2001, blackhat/eu-2001, blackhat/asia-2000, blackhat/eu-2000, blackhat/us-1999, blackhat/us-1998, blackhat/us-1997, defcon/dc-28, defcon/dc-14, defcon/dc-9, defcon/dc-8, defcon/dc-7, defcon/dc-6, defcon/dc-5, defcon/dc-4, defcon/dc-3, defcon/dc-2, defcon/dc-1, usenix/usenix-2025, usenix/usenix-2024, usenix/usenix-2023, usenix/usenix-2022, usenix/usenix-2021, usenix/usenix-2020, usenix/usenix-2019, usenix/usenix-2018, usenix/usenix-2017, usenix/usenix-2016, usenix/usenix-2015, redteamvillage/all, hitcon/hitcon-2025, hitcon/hitcon-2024, hitcon/hitcon-2023, hitcon/hitcon-2022, hitcon/hitcon-2021, hitcon/hitcon-2020, hitcon/hitcon-2019, hitcon/hitcon-2018, hitcon/hitcon-2017, hitcon/hitcon-2016, pretalx/sec-t-2018, pretalx/sec-t-2019, pretalx/sec-t-2020, pretalx/sec-t-2021, pretalx/sec-t-2022, pretalx/sec-t-2023, nullcon/all, mosec/mosec-2019, mosec/mosec-2018, mosec/mosec-2017, mosec/mosec-2016, vb/vb-2026, vb/vb-2025, vb/vb-2024, vb/vb-2023, vb/vb-2022, vb/vb-2021, vb/vb-2020, vb/vb-2019, vb/vb-2018, vb/vb-2017, vb/vb-2016, vb/vb-2015, vb/vb-2014, vb/vb-2013, vb/vb-2012, vb/vb-2011, vb/vb-2010, vb/vb-2009, vb/vb-2008, vb/vb-2007, vb/vb-2006, vb/vb-2005, vb/vb-2004, vb/vb-2003, vb/vb-2002
+failed events: blackhat/us-2014, blackhat/asia-2013, blackhat/us-2013, blackhat/asia-2008, blackhat/asia-2007, blackhat/asia-2006, blackhat/asia-2005, blackhat/eu-2005, blackhat/asia-2004, blackhat/eu-2004, blackhat/asia-2003, blackhat/eu-2003, blackhat/asia-2002, blackhat/eu-2002, blackhat/asia-2001, blackhat/eu-2001, blackhat/asia-2000, blackhat/eu-2000, blackhat/us-1999, blackhat/us-1998, blackhat/us-1997, defcon/dc-28, defcon/dc-14, defcon/dc-9, defcon/dc-8, defcon/dc-7, defcon/dc-6, defcon/dc-5, defcon/dc-4, defcon/dc-3, defcon/dc-2, defcon/dc-1, usenix/usenix-2025, usenix/usenix-2024, usenix/usenix-2023, usenix/usenix-2022, usenix/usenix-2021, usenix/usenix-2020, usenix/usenix-2019, usenix/usenix-2018, usenix/usenix-2017, usenix/usenix-2016, usenix/usenix-2015, redteamvillage/all, hitcon/hitcon-2025, hitcon/hitcon-2024, hitcon/hitcon-2023, hitcon/hitcon-2022, hitcon/hitcon-2021, hitcon/hitcon-2020, hitcon/hitcon-2019, hitcon/hitcon-2018, hitcon/hitcon-2017, hitcon/hitcon-2016, pretalx/sec-t-2018, pretalx/sec-t-2019, pretalx/sec-t-2020, pretalx/sec-t-2021, pretalx/sec-t-2022, pretalx/sec-t-2023, nullcon/all, mosec/mosec-2019, mosec/mosec-2018, mosec/mosec-2017, mosec/mosec-2016, vb/vb-2021, vb/vb-2020
