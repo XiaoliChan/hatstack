@@ -140,7 +140,7 @@ def old_schedule_urls(region: str, year: int) -> list[str] | None:
     Asia has no archived schedule pages after 2005."""
     if region == "asia" and year in (2006, 2007):
         # Japan-era microsites; EN schedule preferred over the JP mirror
-        yy = f"{year:02d}"
+        yy = str(year)[2:]
         return [
             f"https://www.blackhat.com/html/bh-japan-{yy}/bh-jp-{yy}-en-schedule.html",
             f"https://www.blackhat.com/html/bh-japan-{yy}/bh-jp-{yy}-schedule.html",
@@ -149,7 +149,7 @@ def old_schedule_urls(region: str, year: int) -> list[str] | None:
     # asia 2008+ (and everything else outside 03-09) has no IA snapshots
     if year < 2003 or year > 2009 or (region == "asia" and year > 2005):
         return None
-    yy = f"{year:02d}"
+    yy = str(year)[2:]
     folder = f"https://www.blackhat.com/html/bh-{long_r}-{yy}"
     out = []
     for stem in (long_r, {"us": "us", "eu": "eu", "asia": "jp"}[region]):

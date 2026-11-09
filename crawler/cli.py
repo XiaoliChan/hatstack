@@ -44,7 +44,7 @@ def cmd_crawl(args) -> int:
     for adapter in confs.adapters(args.confs):
         print(f"=== {adapter.NAME} ({adapter.ID}) ===")
         ctx = {
-            "events": args.events,
+            "events": [e for tok in (args.events or []) for e in tok.split(",") if e],
             "limit": args.limit,
             "refresh": args.refresh,
             "use_cache": args.use_cache,

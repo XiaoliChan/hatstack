@@ -68,7 +68,7 @@ jobs:
       - name: Crawl ${{ matrix.conf }}
         run: |
           ARGS=""
-          [ -n "$EVENTS" ] && ARGS="$ARGS --events $EVENTS"
+          [ -n "$EVENTS" ] && ARGS="$ARGS --events ${EVENTS//,/ }"
           [ "$REFRESH" = "true" ] && ARGS="$ARGS --refresh"
           python -u -m crawler crawl --confs ${{ matrix.conf }} $ARGS --out /tmp/out
         env:
