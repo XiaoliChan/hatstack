@@ -1,11 +1,11 @@
 # Crawl completeness report
 
-- dataset version: 2026-11-09T04:55:10Z
-- total sessions: 14476
-- sessions with slides: 4703
-- sessions with whitepaper: 686
+- dataset version: 2026-11-09T05:05:19Z
+- total sessions: 14568
+- sessions with slides: 4791
+- sessions with whitepaper: 747
 - sessions with tool: 34
-- sessions with abstract: 9049
+- sessions with abstract: 9136
 
 ## blackhat
 
@@ -52,7 +52,7 @@
 | us-2014 | failed | - | 0 |  | all attempts exhausted |
 | asia-2013 | failed | - | 0 |  | all attempts exhausted |
 | eu-2013 | ok | legacy | 29 |  | got 99445B page via web.archive.org: https://www.blackhat.com/eu-13/archives.html (pdfs: 51) |
-| us-2013 | failed | - | 0 |  | all attempts exhausted |
+| us-2013 | ok | legacy | 92 |  | got 254913B page via web.archive.org: https://www.blackhat.com/us-13/archives.html (pdfs: 142) |
 | eu-2012 | ok | legacy | 32 |  | legacy page 120172B, pdf refs 133 |
 | us-2012 | ok | legacy | 73 |  | got 237713B page via web.archive.org: https://www.blackhat.com/html/bh-us-12/bh-us-12-archives.html (pdfs: 147) |
 | eu-2011 | ok | legacy | 20 |  | legacy page 56509B, pdf refs 24 |
@@ -387,4 +387,4 @@
 | vb-2003 | ok | records | 30 |  | programme 24491B -> 30 talks |
 | vb-2002 | ok | records | 33 |  | programme 26106B -> 33 talks |
 
-failed events: blackhat/us-2014, blackhat/asia-2013, blackhat/us-2013, blackhat/asia-2008, blackhat/us-2004, blackhat/asia-2002, blackhat/eu-2002, blackhat/asia-2001, blackhat/eu-2001, blackhat/asia-2000, blackhat/eu-2000, blackhat/us-1999, blackhat/us-1998, blackhat/us-1997, defcon/dc-28, defcon/dc-14, defcon/dc-9, defcon/dc-8, defcon/dc-7, defcon/dc-6, defcon/dc-5, defcon/dc-4, defcon/dc-3, defcon/dc-2, defcon/dc-1, usenix/usenix-2025, usenix/usenix-2024, usenix/usenix-2023, usenix/usenix-2022, usenix/usenix-2021, usenix/usenix-2020, usenix/usenix-2019, usenix/usenix-2018, usenix/usenix-2017, usenix/usenix-2016, usenix/usenix-2015, redteamvillage/all, hitcon/hitcon-2025, hitcon/hitcon-2024, hitcon/hitcon-2023, hitcon/hitcon-2022, hitcon/hitcon-2021, hitcon/hitcon-2020, hitcon/hitcon-2019, hitcon/hitcon-2018, hitcon/hitcon-2017, hitcon/hitcon-2016, pretalx/sec-t-2018, pretalx/sec-t-2019, pretalx/sec-t-2020, pretalx/sec-t-2021, pretalx/sec-t-2022, pretalx/sec-t-2023, nullcon/all, mosec/mosec-2019, mosec/mosec-2018, mosec/mosec-2017, mosec/mosec-2016, vb/vb-2021, vb/vb-2020
+failed events: blackhat/us-2014, blackhat/asia-2013, blackhat/asia-2008, blackhat/us-2004, blackhat/asia-2002, blackhat/eu-2002, blackhat/asia-2001, blackhat/eu-2001, blackhat/asia-2000, blackhat/eu-2000, blackhat/us-1999, blackhat/us-1998, blackhat/us-1997, defcon/dc-28, defcon/dc-14, defcon/dc-9, defcon/dc-8, defcon/dc-7, defcon/dc-6, defcon/dc-5, defcon/dc-4, defcon/dc-3, defcon/dc-2, defcon/dc-1, usenix/usenix-2025, usenix/usenix-2024, usenix/usenix-2023, usenix/usenix-2022, usenix/usenix-2021, usenix/usenix-2020, usenix/usenix-2019, usenix/usenix-2018, usenix/usenix-2017, usenix/usenix-2016, usenix/usenix-2015, redteamvillage/all, hitcon/hitcon-2025, hitcon/hitcon-2024, hitcon/hitcon-2023, hitcon/hitcon-2022, hitcon/hitcon-2021, hitcon/hitcon-2020, hitcon/hitcon-2019, hitcon/hitcon-2018, hitcon/hitcon-2017, hitcon/hitcon-2016, pretalx/sec-t-2018, pretalx/sec-t-2019, pretalx/sec-t-2020, pretalx/sec-t-2021, pretalx/sec-t-2022, pretalx/sec-t-2023, nullcon/all, mosec/mosec-2019, mosec/mosec-2018, mosec/mosec-2017, mosec/mosec-2016, vb/vb-2021, vb/vb-2020

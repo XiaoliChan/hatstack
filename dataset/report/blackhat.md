@@ -43,7 +43,7 @@
 | us-2014 | failed | - | 0 |  | all attempts exhausted |
 | asia-2013 | failed | - | 0 |  | all attempts exhausted |
 | eu-2013 | ok | legacy | 29 |  | got 99445B page via web.archive.org: https://www.blackhat.com/eu-13/archives.html (pdfs: 51) |
-| us-2013 | failed | - | 0 |  | all attempts exhausted |
+| us-2013 | ok | legacy | 92 |  | got 254913B page via web.archive.org: https://www.blackhat.com/us-13/archives.html (pdfs: 142) |
 | eu-2012 | ok | legacy | 32 |  | legacy page 120172B, pdf refs 133 |
 | us-2012 | ok | legacy | 73 |  | got 237713B page via web.archive.org: https://www.blackhat.com/html/bh-us-12/bh-us-12-archives.html (pdfs: 147) |
 | eu-2011 | ok | legacy | 20 |  | legacy page 56509B, pdf refs 24 |
