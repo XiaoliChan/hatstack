@@ -232,9 +232,13 @@ def parse_legacy_html(event: dict, html: str) -> list[dict]:
 def parse_rendered_schedule(event: dict, html: str) -> list[dict]:
     """Rendered Black Hat schedule DOM (no-XHR years): li rows under
     ul#cal_content_Day carry title/speakers; detail modals (when present)
-    carry abstract + material links."""
+    carry abstract + material links.
+
+    html.parser (not lxml): crawler-harvested modal blocks appended after a
+    JS-rendered DOM contain mis-nested tags that lxml silently truncates —
+    observed losing all 124 harvested modals; html.parser keeps them."""
     label = event_label(event["region"], event["year"])
-    soup = BeautifulSoup(html, "lxml")
+    soup = BeautifulSoup(html, "html.parser")
     records = []
     seen: set[str] = set()
     # structured rows first (itemprop-rich schedule markup)
